@@ -31,6 +31,10 @@ export function createClient() {
 
 // Fetches the signed-in user's profile (role, name, etc.), or null if signed
 // out or if Supabase isn't reachable (e.g. env vars not yet configured).
+// Self-heals: if the auth user exists but the profiles row is missing (e.g.
+// the sign-up trigger didn't fire, or was added after this account was
+// created), it creates the row on the fly instead of leaving the page with
+// nothing to render.
 export async function getProfile() {
   try {
     const supabase = createClient();
@@ -45,7 +49,22 @@ export async function getProfile() {
       .eq("id", user.id)
       .single();
 
-    return profile ? { ...profile, authUser: user } : null;
+    if (profile) return { ...profile, authUser: user };
+
+    const { data: created } = await supabase
+      .from("profiles")
+      .insert({
+        id: user.id,
+        email: user.email,
+        ac_name: user.user_metadata?.ac_name || "",
+        phone: user.user_metadata?.phone || null,
+        address: user.user_metadata?.address || null,
+        role: user.user_metadata?.role || "user",
+      })
+      .select()
+      .single();
+
+    return created ? { ...created, authUser: user } : null;
   } catch {
     return null;
   }

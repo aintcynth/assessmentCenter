@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getProfile } from "@/lib/supabase/server";
 import { createClient } from "@/lib/supabase/server";
 import ClientShell from "@/components/ClientShell";
@@ -5,6 +6,7 @@ import StatusPill from "@/components/StatusPill";
 
 export default async function AccreditedPage() {
   const profile = await getProfile();
+  if (!profile) redirect("/login");
   const supabase = createClient();
 
   const { data: centers } = await supabase

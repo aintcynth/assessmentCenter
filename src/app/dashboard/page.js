@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getProfile } from "@/lib/supabase/server";
 import { createClient } from "@/lib/supabase/server";
@@ -6,6 +7,7 @@ import StatusPill from "@/components/StatusPill";
 
 export default async function DashboardPage() {
   const profile = await getProfile();
+  if (!profile) redirect("/login");
   const supabase = createClient();
   const { data: applications } = await supabase
     .from("assessment_applications")

@@ -1,0 +1,53 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --seal: #0b3b5c;
+  --brass: #b98a3e;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-parchment text-ink font-body antialiased;
+}
+
+/* Signature element: a wax-seal style status ring used throughout the
+   application timeline (Draft -> Submitted -> Approved -> Inspection ->
+   Accredited -> Complete). */
+.seal-ring {
+  @apply relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 font-display text-sm font-semibold;
+}
+
+.status-pill {
+  @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium tracking-wide;
+}
+
+.card {
+  @apply rounded-seal border border-seal/10 bg-white/70 p-6 shadow-[0_1px_0_rgba(11,59,92,0.06)];
+}
+
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 rounded-seal bg-seal px-5 py-2.5 text-sm font-semibold text-parchment transition hover:bg-seal-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+.btn-secondary {
+  @apply inline-flex items-center justify-center gap-2 rounded-seal border border-seal/20 bg-transparent px-5 py-2.5 text-sm font-semibold text-seal transition hover:bg-seal/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass;
+}
+
+.btn-ghost {
+  @apply inline-flex items-center justify-center gap-2 rounded-seal px-3 py-2 text-sm font-medium text-seal/70 transition hover:bg-seal/5 hover:text-seal;
+}
+
+.input-field {
+  @apply w-full rounded-seal border border-seal/20 bg-white px-3.5 py-2.5 text-sm text-ink placeholder:text-ink/40 focus:border-brass focus:outline-none focus:ring-1 focus:ring-brass;
+}
+
+.label {
+  @apply mb-1.5 block text-xs font-semibold uppercase tracking-wider text-seal/70;
+}

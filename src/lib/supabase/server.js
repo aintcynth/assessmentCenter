@@ -1,0 +1,52 @@
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
+
+export function createClient() {
+  const cookieStore = cookies();
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-anon-key";
+
+  return createServerClient(
+    url,
+    key,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          } catch {
+            // Called from a Server Component with no write access — safe to ignore
+            // because middleware refreshes the session on every request.
+          }
+        },
+      },
+    }
+  );
+}
+
+// Fetches the signed-in user's profile (role, name, etc.), or null if signed
+// out or if Supabase isn't reachable (e.g. env vars not yet configured).
+export async function getProfile() {
+  try {
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single();
+
+    return profile ? { ...profile, authUser: user } : null;
+  } catch {
+    return null;
+  }
+}

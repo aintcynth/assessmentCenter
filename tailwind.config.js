@@ -7,15 +7,16 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        ink: "#101820",
-        seal: "#0B3B5C",
-        "seal-dark": "#082A42",
-        parchment: "#F7F3EA",
-        brass: "#B98A3E",
-        "brass-light": "#E4C88C",
-        moss: "#3E6B4F",
-        clay: "#B4483B",
-        mist: "#E9EEF1",
+        ink: "#1B2733",
+        canvas: "#93A9C2",        // outer page background (slate blue)
+        seal: "#0C2E4E",          // sidebar / primary navy
+        "seal-dark": "#081D33",   // deeper navy for hovers
+        parchment: "#F8FAFC",     // near-white, used as text-on-navy
+        brass: "#2F6FED",         // accent blue (links, active icon tint)
+        "brass-light": "#E4ECFC",// light blue tint for badges/backgrounds
+        moss: "#16A34A",          // success / positive delta / active
+        clay: "#DC2626",          // danger / declined / late
+        mist: "#EEF2F6",          // subtle field / divider background
       },
       fontFamily: {
         display: ["'Fraunces'", "serif"],

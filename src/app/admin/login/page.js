@@ -38,7 +38,7 @@ export default function AdminLoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-seal-dark px-6">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="seal-ring mx-auto mb-4 border-brass-light text-brass-light">AC</div>
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-lg font-display font-bold text-seal mx-auto mb-4">AC</div>
           <h1 className="font-display text-2xl font-semibold text-parchment">Admin console</h1>
           <p className="mt-1 text-sm text-parchment/60">Review and issue accreditation.</p>
         </div>

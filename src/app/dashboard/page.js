@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { FileText, Clock3, CheckCircle2 } from "lucide-react";
 import { getProfile } from "@/lib/supabase/server";
 import { createClient } from "@/lib/supabase/server";
 import ClientShell from "@/components/ClientShell";
 import StatusPill from "@/components/StatusPill";
+import StatCard from "@/components/StatCard";
 
 export default async function DashboardPage() {
   const profile = await getProfile();
@@ -34,18 +36,20 @@ export default async function DashboardPage() {
       </div>
 
       <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="card">
-          <p className="text-xs uppercase tracking-wider text-ink/50">Total applications</p>
-          <p className="mt-2 font-display text-3xl text-seal">{apps.length}</p>
-        </div>
-        <div className="card">
-          <p className="text-xs uppercase tracking-wider text-ink/50">Pending review</p>
-          <p className="mt-2 font-display text-3xl text-brass">{pending}</p>
-        </div>
-        <div className="card">
-          <p className="text-xs uppercase tracking-wider text-ink/50">Approved</p>
-          <p className="mt-2 font-display text-3xl text-moss">{approved}</p>
-        </div>
+        <StatCard icon={FileText} label="Total applications" value={apps.length} />
+        <StatCard
+          icon={Clock3}
+          label="Pending review"
+          value={pending}
+          delta={pending > 0 ? "Awaiting admin action" : undefined}
+          deltaTone="neutral"
+        />
+        <StatCard
+          icon={CheckCircle2}
+          label="Approved"
+          value={approved}
+          delta={approved > 0 ? "On track" : undefined}
+        />
       </div>
 
       <div className="card">

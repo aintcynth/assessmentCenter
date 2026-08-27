@@ -28,10 +28,10 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-parchment px-6">
+    <div className="flex min-h-screen items-center justify-center bg-canvas px-6">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="seal-ring mx-auto mb-4 border-seal text-seal">AC</div>
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-seal text-lg font-display font-bold text-parchment mx-auto mb-4">AC</div>
           <h1 className="font-display text-2xl font-semibold text-seal">Welcome back</h1>
           <p className="mt-1 text-sm text-ink/60">Log in to continue your application.</p>
         </div>

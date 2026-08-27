@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { FileText, Clock3, CheckCircle2, XCircle } from "lucide-react";
 import { getProfile } from "@/lib/supabase/server";
 import { createClient } from "@/lib/supabase/server";
 import AdminShell from "@/components/AdminShell";
 import StatusPill from "@/components/StatusPill";
+import StatCard from "@/components/StatCard";
 
 export default async function AdminDashboardPage() {
   const profile = await getProfile();
@@ -31,22 +33,27 @@ export default async function AdminDashboardPage() {
       </div>
 
       <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="card">
-          <p className="text-xs uppercase tracking-wider text-ink/50">Total applications</p>
-          <p className="mt-2 font-display text-3xl text-seal">{counts.total}</p>
-        </div>
-        <div className="card">
-          <p className="text-xs uppercase tracking-wider text-ink/50">Pending</p>
-          <p className="mt-2 font-display text-3xl text-brass">{counts.pending}</p>
-        </div>
-        <div className="card">
-          <p className="text-xs uppercase tracking-wider text-ink/50">Approved</p>
-          <p className="mt-2 font-display text-3xl text-moss">{counts.approved}</p>
-        </div>
-        <div className="card">
-          <p className="text-xs uppercase tracking-wider text-ink/50">Denied</p>
-          <p className="mt-2 font-display text-3xl text-clay">{counts.denied}</p>
-        </div>
+        <StatCard icon={FileText} label="Total applications" value={counts.total} />
+        <StatCard
+          icon={Clock3}
+          label="Pending"
+          value={counts.pending}
+          delta={counts.pending > 0 ? "Needs review" : undefined}
+          deltaTone="neutral"
+        />
+        <StatCard
+          icon={CheckCircle2}
+          label="Approved"
+          value={counts.approved}
+          delta={counts.approved > 0 ? "In progress" : undefined}
+        />
+        <StatCard
+          icon={XCircle}
+          label="Denied"
+          value={counts.denied}
+          delta={counts.denied > 0 ? "Awaiting resubmit" : undefined}
+          deltaTone="negative"
+        />
       </div>
 
       <div className="card">

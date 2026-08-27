@@ -81,6 +81,12 @@ export default async function DashboardPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <StatusPill status={app.status} />
+                  <Link
+                    href={`/application/${app.id}`}
+                    className="text-sm font-medium text-seal hover:text-brass"
+                  >
+                    View
+                  </Link>
                 </div>
               </li>
             ))}

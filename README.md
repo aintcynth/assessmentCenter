@@ -20,6 +20,36 @@ existing phpMyAdmin/MariaDB dump — see [`supabase/schema.sql`](./supabase/sche
 | `assessment_applications`            | `assessment_applications`             |
 | `assessment_application_documents`   | `assessment_application_documents`    |
 | `assessment_centers`                 | `assessment_centers`                  |
+| —                                     | `inspections` (new)                   |
+| —                                     | `payment_submissions` (new)           |
+| —                                     | `application_activity_log` (new — the "trailsheet") |
+
+## The full workflow (from the hand-drawn client/admin process flows)
+
+1. **Apply** — client picks a qualification, uploads supporting documents,
+   submits (`status = 'pending'`).
+2. **Documents review** — admin approves or declines. Declined applications
+   (`status = 'denied'`) show the admin's remarks; the client can add more
+   documents and resubmit, which flips the status back to `pending`.
+3. **Inspection** — once approved, the admin sets an inspection date and
+   assigns an expert (a new row in `inspections`, `status = 'inspection_scheduled'`).
+4. **Compliance check** — after the visit, the admin uploads the signed
+   inspection report and marks the inspection compliant or not.
+   - **Non-compliant**: lackings are recorded on that `inspections` row: the
+     client sees them, and the admin schedules a **reinspection** (a new
+     `inspections` row) — this can repeat as many times as needed.
+   - **Compliant**: a certificate number is reserved on the application
+     (`cert_number`) and the status moves to `awaiting_payment`.
+5. **Payment / AOU** — the client uploads a receipt of payment and an AOU
+   (Affidavit of Undertaking) into `payment_submissions`.
+6. **Certificate release** — once both are in, the admin releases the
+   certificate: this creates the `assessment_centers` row and flips the
+   application to `status = 'accredited'`.
+
+Every step above writes a row to `application_activity_log` (the
+"trailsheet") — visible to both the client and the admin on the
+application detail pages (`/application/[id]` and
+`/admin/applications/[id]`), showing what happened, when, and by whom.
 
 Notes on the migration:
 - `users.password` is gone — Supabase Auth handles credentials, so `profiles`
@@ -47,13 +77,14 @@ Notes on the migration:
 ## 1. Set up Supabase
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. Open **SQL Editor** and run the contents of [`supabase/schema.sql`](./supabase/schema.sql).
-   This creates every table in the flow (`profiles`, `applications`,
-   `documents`, `inspections`, `poi_requirements`, `payment_proofs`,
-   `centers`, `certificates`), enables Row Level Security so applicants can
-   only see their own records while admins see everything, adds a trigger
-   that auto-creates a `profiles` row on sign-up, and creates a public
-   storage bucket (`accreditation-files`) for uploaded documents.
+2. Open **SQL Editor** and run the contents of [`supabase/schema.sql`](./supabase/schema.sql)
+   — for a **brand-new** project only. It creates every table, RLS policy,
+   and seeds the full NC qualification catalog.
+   - If you already have this project running from an earlier version,
+     instead run [`supabase/002_inspection_workflow.sql`](./supabase/002_inspection_workflow.sql),
+     which additively creates the `inspections`, `payment_submissions`, and
+     `application_activity_log` tables and widens `assessment_applications.status`
+     without touching your existing data.
 3. In **Project Settings → API**, copy the **Project URL** and **anon public
    key**.
 4. To create your first administrator: sign up normally through the app,

@@ -53,7 +53,10 @@ create table if not exists public.assessment_applications (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles (id) on delete cascade,
   qualification_id integer not null references public.qualifications (id),
-  status text not null default 'pending' check (status in ('pending', 'approved', 'denied')),
+  status text not null default 'pending' check (
+    status in ('pending', 'denied', 'inspection_scheduled', 'awaiting_payment', 'accredited')
+  ),
+  cert_number text,
   admin_reason text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -75,8 +78,54 @@ create table if not exists public.assessment_application_documents (
 );
 
 -- ---------------------------------------------------------------------------
--- 5. Assessment centers (was `assessment_centers`) — the accredited-center +
---    certificate record, created once an application is approved.
+-- 5. Inspections — one row per inspection attempt. Supports the
+--    schedule -> compliant? -> (lackings -> reschedule) cycle from the
+--    flowcharts; an application can have several rows here if it takes more
+--    than one visit to become compliant.
+-- ---------------------------------------------------------------------------
+create table if not exists public.inspections (
+  id uuid primary key default gen_random_uuid(),
+  application_id uuid not null references public.assessment_applications (id) on delete cascade,
+  inspection_date date,
+  expert_name text,
+  report_url text,          -- signed inspection report, uploaded by admin
+  compliant boolean,         -- null = outcome not yet recorded
+  lackings text,             -- admin's notes when compliant = false
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------------
+-- 6. Payment submissions — receipt of payment + AOU, uploaded by the client
+--    once inspection compliance is confirmed.
+-- ---------------------------------------------------------------------------
+create table if not exists public.payment_submissions (
+  id uuid primary key default gen_random_uuid(),
+  application_id uuid not null unique references public.assessment_applications (id) on delete cascade,
+  receipt_url text,
+  receipt_uploaded_at timestamptz,
+  aou_url text,
+  aou_uploaded_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------------
+-- 7. Application activity log ("trailsheet") — a timestamped record of what
+--    happened and when, per the handwritten note on the admin flowchart.
+-- ---------------------------------------------------------------------------
+create table if not exists public.application_activity_log (
+  id uuid primary key default gen_random_uuid(),
+  application_id uuid not null references public.assessment_applications (id) on delete cascade,
+  actor_id uuid references public.profiles (id) on delete set null,
+  actor_name text,
+  action text not null,
+  notes text,
+  created_at timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------------
+-- 8. Assessment centers (was `assessment_centers`) — the accredited-center +
+--    certificate record, created once a certificate is released.
 -- ---------------------------------------------------------------------------
 create table if not exists public.assessment_centers (
   id uuid primary key default gen_random_uuid(),
@@ -98,6 +147,9 @@ alter table public.profiles enable row level security;
 alter table public.qualifications enable row level security;
 alter table public.assessment_applications enable row level security;
 alter table public.assessment_application_documents enable row level security;
+alter table public.inspections enable row level security;
+alter table public.payment_submissions enable row level security;
+alter table public.application_activity_log enable row level security;
 alter table public.assessment_centers enable row level security;
 
 create or replace function public.is_admin()
@@ -134,6 +186,41 @@ create policy "documents_select" on public.assessment_application_documents for 
   )
 );
 create policy "documents_insert" on public.assessment_application_documents for insert with check (
+  public.is_admin() or exists (
+    select 1 from public.assessment_applications a where a.id = application_id and a.user_id = auth.uid()
+  )
+);
+
+-- Inspections: owner reads, admin manages
+create policy "inspections_select" on public.inspections for select using (
+  public.is_admin() or exists (
+    select 1 from public.assessment_applications a where a.id = application_id and a.user_id = auth.uid()
+  )
+);
+create policy "inspections_admin_write" on public.inspections for insert with check (public.is_admin());
+create policy "inspections_admin_update" on public.inspections for update using (public.is_admin());
+
+-- Payment submissions: owner uploads/reads their own, admin reads
+create policy "payment_select" on public.payment_submissions for select using (
+  public.is_admin() or exists (
+    select 1 from public.assessment_applications a where a.id = application_id and a.user_id = auth.uid()
+  )
+);
+create policy "payment_insert" on public.payment_submissions for insert with check (
+  exists (select 1 from public.assessment_applications a where a.id = application_id and a.user_id = auth.uid())
+);
+create policy "payment_update" on public.payment_submissions for update using (
+  exists (select 1 from public.assessment_applications a where a.id = application_id and a.user_id = auth.uid())
+);
+
+-- Activity log (trailsheet): owner + admin read; either can append entries
+-- tied to their own application
+create policy "activity_select" on public.application_activity_log for select using (
+  public.is_admin() or exists (
+    select 1 from public.assessment_applications a where a.id = application_id and a.user_id = auth.uid()
+  )
+);
+create policy "activity_insert" on public.application_activity_log for insert with check (
   public.is_admin() or exists (
     select 1 from public.assessment_applications a where a.id = application_id and a.user_id = auth.uid()
   )

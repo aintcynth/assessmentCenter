@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { logActivity } from "@/lib/activity";
 import ClientShell from "@/components/ClientShell";
 
 // Client-only Supabase calls happen at render time, so skip static
@@ -139,6 +140,14 @@ function ApplyWizard() {
         const { error: docsError } = await supabase.from("assessment_application_documents").insert(rows);
         if (docsError) throw docsError;
       }
+
+      await logActivity(supabase, {
+        applicationId: application.id,
+        actorId: user.id,
+        actorName: profile?.ac_name,
+        action: "Application submitted",
+        notes: `${selectedQualification?.name || "Qualification"} · ${stagedDocs.length} document(s) attached`,
+      });
 
       router.push("/dashboard");
     } catch (err) {

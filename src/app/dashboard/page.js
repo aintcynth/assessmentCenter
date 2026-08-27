@@ -8,7 +8,7 @@ import StatusPill from "@/components/StatusPill";
 export default async function DashboardPage() {
   const profile = await getProfile();
   if (!profile) redirect("/login");
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: applications } = await supabase
     .from("assessment_applications")
     .select("*, qualifications:qualification_id(name, code, level)")

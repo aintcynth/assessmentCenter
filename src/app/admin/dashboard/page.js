@@ -8,7 +8,7 @@ import StatusPill from "@/components/StatusPill";
 export default async function AdminDashboardPage() {
   const profile = await getProfile();
   if (!profile) redirect("/admin/login");
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data: applications } = await supabase
     .from("assessment_applications")

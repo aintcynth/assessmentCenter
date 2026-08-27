@@ -7,7 +7,7 @@ import StatusPill from "@/components/StatusPill";
 export default async function AdminAccreditedPage() {
   const profile = await getProfile();
   if (!profile) redirect("/admin/login");
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: centers } = await supabase
     .from("assessment_centers")
     .select("*, profiles:user_id(ac_name), qualifications:qualification_id(name, code)")

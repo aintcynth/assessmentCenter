@@ -7,6 +7,7 @@ import { logActivity } from "@/lib/activity";
 import ClientShell from "@/components/ClientShell";
 import StatusPill from "@/components/StatusPill";
 import Trailsheet from "@/components/Trailsheet";
+import DocumentTypeTag from "@/components/DocumentTypeTag";
 
 // Client-only Supabase calls happen at render time, so skip static
 // prerendering (which runs at build time, before env vars may be wired up).
@@ -212,6 +213,47 @@ export default function ApplicationDetailPage() {
 
   const latestInspection = inspections[0];
 
+  const allFiles = [
+    ...documents.map((d) => ({
+      id: `doc-${d.id}`,
+      kind: "Application document",
+      label: `Req. ${d.requirement_index}: ${d.filename_original}`,
+      url: d.file_url,
+      uploaded_at: d.uploaded_at,
+    })),
+    ...inspections
+      .filter((insp) => insp.report_url)
+      .map((insp) => ({
+        id: `insp-${insp.id}`,
+        kind: "Inspection report",
+        label: `Signed report — ${insp.inspection_date || "inspection"}`,
+        url: insp.report_url,
+        uploaded_at: insp.updated_at || insp.created_at,
+      })),
+    ...(payment?.receipt_url
+      ? [
+          {
+            id: `receipt-${payment.id}`,
+            kind: "Receipt of payment",
+            label: "Receipt of payment",
+            url: payment.receipt_url,
+            uploaded_at: payment.receipt_uploaded_at,
+          },
+        ]
+      : []),
+    ...(payment?.aou_url
+      ? [
+          {
+            id: `aou-${payment.id}`,
+            kind: "AOU",
+            label: "AOU",
+            url: payment.aou_url,
+            uploaded_at: payment.aou_uploaded_at,
+          },
+        ]
+      : []),
+  ].sort((a, b) => new Date(b.uploaded_at || 0) - new Date(a.uploaded_at || 0));
+
   return (
     <ClientShell acName={profile?.ac_name}>
       <button onClick={() => router.push("/dashboard")} className="btn-ghost mb-4 !px-0">
@@ -389,18 +431,21 @@ export default function ApplicationDetailPage() {
           )}
 
           <div className="card">
-            <h2 className="mb-3 font-display text-lg font-semibold text-seal">Documents</h2>
-            {documents.length === 0 ? (
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="font-display text-lg font-semibold text-seal">Documents</h2>
+              <span className="text-xs text-ink/40">{allFiles.length} file(s)</span>
+            </div>
+            {allFiles.length === 0 ? (
               <p className="text-sm text-ink/50">No documents on file.</p>
             ) : (
               <ul className="divide-y divide-seal/10">
-                {documents.map((doc) => (
-                  <li key={doc.id} className="flex items-center justify-between py-2 text-sm">
-                    <span>
-                      <span className="font-medium text-ink">Req. {doc.requirement_index}:</span>{" "}
-                      {doc.filename_original}
-                    </span>
-                    <a href={doc.file_url} target="_blank" className="font-medium text-seal hover:text-brass">
+                {allFiles.map((f) => (
+                  <li key={f.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <DocumentTypeTag kind={f.kind} />
+                      <span className="truncate text-ink">{f.label}</span>
+                    </div>
+                    <a href={f.url} target="_blank" className="shrink-0 font-medium text-seal hover:text-brass">
                       View →
                     </a>
                   </li>

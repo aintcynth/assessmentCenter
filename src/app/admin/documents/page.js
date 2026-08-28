@@ -3,25 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import AdminShell from "@/components/AdminShell";
+import DocumentTypeTag from "@/components/DocumentTypeTag";
 
 // Client-only Supabase calls happen at render time, so skip static
 // prerendering (which runs at build time, before env vars may be wired up).
 export const dynamic = "force-dynamic";
 
-const KIND_STYLES = {
-  "Application document": "border-seal/20 bg-seal/5 text-seal/80",
-  "Inspection report": "border-brass/30 bg-brass-light/40 text-brass",
-  "Receipt of payment": "border-moss/30 bg-moss/10 text-moss",
-  AOU: "border-moss/30 bg-moss/10 text-moss",
-};
-
 const KIND_OPTIONS = ["All types", "Application document", "Inspection report", "Receipt of payment", "AOU"];
-
-function KindTag({ kind }) {
-  return (
-    <span className={`status-pill ${KIND_STYLES[kind] || "border-ink/15 bg-ink/5 text-ink/60"}`}>{kind}</span>
-  );
-}
 
 export default function AdminDocumentsPage() {
   const supabase = createClient();
@@ -171,7 +159,7 @@ export default function AdminDocumentsPage() {
                 {filtered.map((f) => (
                   <tr key={f.id}>
                     <td className="py-2.5 pr-4">
-                      <KindTag kind={f.kind} />
+                      <DocumentTypeTag kind={f.kind} />
                     </td>
                     <td className="py-2.5 pr-4 text-ink">{f.label}</td>
                     <td className="py-2.5 pr-4 text-ink/70">{f.applicant || "—"}</td>

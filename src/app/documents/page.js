@@ -3,24 +3,12 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import ClientShell from "@/components/ClientShell";
+import DocumentTypeTag from "@/components/DocumentTypeTag";
 import StatusPill from "@/components/StatusPill";
 
 // Client-only Supabase calls happen at render time, so skip static
 // prerendering (which runs at build time, before env vars may be wired up).
 export const dynamic = "force-dynamic";
-
-const KIND_STYLES = {
-  "Application document": "border-seal/20 bg-seal/5 text-seal/80",
-  "Inspection report": "border-brass/30 bg-brass-light/40 text-brass",
-  "Receipt of payment": "border-moss/30 bg-moss/10 text-moss",
-  AOU: "border-moss/30 bg-moss/10 text-moss",
-};
-
-function KindTag({ kind }) {
-  return (
-    <span className={`status-pill ${KIND_STYLES[kind] || "border-ink/15 bg-ink/5 text-ink/60"}`}>{kind}</span>
-  );
-}
 
 export default function DocumentsPage() {
   const supabase = createClient();
@@ -151,7 +139,7 @@ export default function DocumentsPage() {
                   {app.files.map((f) => (
                     <li key={f.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
                       <div className="flex min-w-0 items-center gap-3">
-                        <KindTag kind={f.kind} />
+                        <DocumentTypeTag kind={f.kind} />
                         <span className="truncate text-ink">{f.label}</span>
                       </div>
                       <a href={f.url} target="_blank" className="shrink-0 font-medium text-seal hover:text-brass">

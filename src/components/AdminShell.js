@@ -9,6 +9,7 @@ import {
   FileBadge,
   GraduationCap,
   Users,
+  FolderOpen,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import AppFrame from "@/components/AppFrame";
@@ -16,6 +17,7 @@ import AppFrame from "@/components/AppFrame";
 const LINKS = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/applications", label: "Applications", icon: FileText },
+  { href: "/admin/documents", label: "Documents", icon: FolderOpen },
   { href: "/admin/accredited", label: "Accredited", icon: Award },
   { href: "/admin/centers", label: "Centers", icon: Building2 },
   { href: "/admin/certificates", label: "Certificate of accreditation", icon: FileBadge },

@@ -9,10 +9,24 @@ import StatusPill from "@/components/StatusPill";
 // prerendering (which runs at build time, before env vars may be wired up).
 export const dynamic = "force-dynamic";
 
+const KIND_STYLES = {
+  "Application document": "border-seal/20 bg-seal/5 text-seal/80",
+  "Inspection report": "border-brass/30 bg-brass-light/40 text-brass",
+  "Receipt of payment": "border-moss/30 bg-moss/10 text-moss",
+  AOU: "border-moss/30 bg-moss/10 text-moss",
+};
+
+function KindTag({ kind }) {
+  return (
+    <span className={`status-pill ${KIND_STYLES[kind] || "border-ink/15 bg-ink/5 text-ink/60"}`}>{kind}</span>
+  );
+}
+
 export default function DocumentsPage() {
   const supabase = createClient();
   const [profile, setProfile] = useState(null);
   const [applications, setApplications] = useState([]);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -30,34 +44,94 @@ export default function DocumentsPage() {
         .order("created_at", { ascending: false });
 
       const appIds = (apps || []).map((a) => a.id);
-      let docsByApp = {};
+      const filesByApp = {};
+      appIds.forEach((id) => (filesByApp[id] = []));
+
       if (appIds.length) {
-        const { data: docs } = await supabase
-          .from("assessment_application_documents")
-          .select("*")
-          .in("application_id", appIds)
-          .order("requirement_index");
+        const [{ data: docs }, { data: inspections }, { data: payments }] = await Promise.all([
+          supabase
+            .from("assessment_application_documents")
+            .select("*")
+            .in("application_id", appIds)
+            .order("requirement_index"),
+          supabase
+            .from("inspections")
+            .select("*")
+            .in("application_id", appIds)
+            .not("report_url", "is", null)
+            .order("created_at", { ascending: false }),
+          supabase.from("payment_submissions").select("*").in("application_id", appIds),
+        ]);
+
         (docs || []).forEach((d) => {
-          docsByApp[d.application_id] = [...(docsByApp[d.application_id] || []), d];
+          filesByApp[d.application_id]?.push({
+            id: `doc-${d.id}`,
+            kind: "Application document",
+            label: `Req. ${d.requirement_index}: ${d.filename_original}`,
+            url: d.file_url,
+            uploaded_at: d.uploaded_at,
+          });
+        });
+
+        (inspections || []).forEach((insp) => {
+          filesByApp[insp.application_id]?.push({
+            id: `insp-${insp.id}`,
+            kind: "Inspection report",
+            label: `Signed report — ${insp.inspection_date || "inspection"}`,
+            url: insp.report_url,
+            uploaded_at: insp.updated_at || insp.created_at,
+          });
+        });
+
+        (payments || []).forEach((pay) => {
+          if (pay.receipt_url) {
+            filesByApp[pay.application_id]?.push({
+              id: `receipt-${pay.id}`,
+              kind: "Receipt of payment",
+              label: "Receipt of payment",
+              url: pay.receipt_url,
+              uploaded_at: pay.receipt_uploaded_at,
+            });
+          }
+          if (pay.aou_url) {
+            filesByApp[pay.application_id]?.push({
+              id: `aou-${pay.id}`,
+              kind: "AOU",
+              label: "AOU",
+              url: pay.aou_url,
+              uploaded_at: pay.aou_uploaded_at,
+            });
+          }
+        });
+
+        Object.keys(filesByApp).forEach((id) => {
+          filesByApp[id].sort((a, b) => new Date(b.uploaded_at || 0) - new Date(a.uploaded_at || 0));
         });
       }
 
-      setApplications((apps || []).map((a) => ({ ...a, documents: docsByApp[a.id] || [] })));
+      setApplications((apps || []).map((a) => ({ ...a, files: filesByApp[a.id] || [] })));
+      setLoaded(true);
     }
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const totalFiles = applications.reduce((sum, a) => sum + a.files.length, 0);
+
   return (
     <ClientShell acName={profile?.ac_name}>
-      <div className="mb-8">
-        <p className="text-xs font-semibold uppercase tracking-wider text-brass">Documents</p>
-        <h1 className="font-display text-3xl font-semibold text-seal">Submitted documents</h1>
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-brass">Documents</p>
+          <h1 className="font-display text-3xl font-semibold text-seal">All submitted documents</h1>
+        </div>
+        {loaded && <p className="text-sm text-ink/50">{totalFiles} file(s) across {applications.length} application(s)</p>}
       </div>
 
       {applications.length === 0 ? (
         <div className="card text-center text-sm text-ink/60">
-          Documents you upload while applying will appear here, grouped by application.
+          Documents you upload while applying — application files, inspection reports, receipts, and AOUs — will
+          appear here, grouped by application.
         </div>
       ) : (
         <div className="space-y-6">
@@ -70,17 +144,17 @@ export default function DocumentsPage() {
                 </div>
                 <StatusPill status={app.status} />
               </div>
-              {app.documents.length === 0 ? (
+              {app.files.length === 0 ? (
                 <p className="text-sm text-ink/50">No documents uploaded for this application.</p>
               ) : (
                 <ul className="divide-y divide-seal/10">
-                  {app.documents.map((doc) => (
-                    <li key={doc.id} className="flex items-center justify-between py-2 text-sm">
-                      <span>
-                        <span className="font-medium text-ink">Req. {doc.requirement_index}:</span>{" "}
-                        {doc.filename_original}
-                      </span>
-                      <a href={doc.file_url} target="_blank" className="font-medium text-seal hover:text-brass">
+                  {app.files.map((f) => (
+                    <li key={f.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <KindTag kind={f.kind} />
+                        <span className="truncate text-ink">{f.label}</span>
+                      </div>
+                      <a href={f.url} target="_blank" className="shrink-0 font-medium text-seal hover:text-brass">
                         View →
                       </a>
                     </li>

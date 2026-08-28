@@ -8,6 +8,9 @@ import AdminShell from "@/components/AdminShell";
 import StatusPill from "@/components/StatusPill";
 import Trailsheet from "@/components/Trailsheet";
 import DocumentTypeTag from "@/components/DocumentTypeTag";
+import PdfViewer from "@/components/PdfViewer";
+import { notifyUser } from "@/lib/notifications";
+import { generateCertificatePdf, generateAouPdf } from "@/lib/certificatePdf";
 
 // Client-only Supabase calls happen at render time, so skip static
 // prerendering (which runs at build time, before env vars may be wired up).
@@ -40,6 +43,11 @@ export default function AdminApplicationDetailPage() {
   const [scheduledDate, setScheduledDate] = useState("");
   const [reportFile, setReportFile] = useState(null);
   const [lackings, setLackings] = useState("");
+
+  const [issuanceDate, setIssuanceDate] = useState("");
+  const [signedCertFile, setSignedCertFile] = useState(null);
+  const [rejectingKind, setRejectingKind] = useState(null); // "receipt" | "aou" | null
+  const [rejectReason, setRejectReason] = useState("");
 
   async function load() {
     const {
@@ -254,7 +262,7 @@ export default function AdminApplicationDetailPage() {
       const certNumber = generateCertNumber(app.qualifications?.code);
       const { error: appUpdateError } = await supabase
         .from("assessment_applications")
-        .update({ status: "awaiting_payment", cert_number: certNumber })
+        .update({ status: "certificate_processing", cert_number: certNumber })
         .eq("id", id);
       if (appUpdateError) throw appUpdateError;
 
@@ -275,22 +283,232 @@ export default function AdminApplicationDetailPage() {
     }
   }
 
+  // Set issuance date (expiry auto = +2 years) and generate the draft
+  // certificate + AOU PDFs for the admin to review before notifying.
+  async function handleGenerateCertificate(e) {
+    e.preventDefault();
+    if (!issuanceDate) return;
+    setBusy(true);
+    setError("");
+    try {
+      const user = await currentAdmin();
+      const issued = new Date(issuanceDate + "T00:00:00");
+      const expiry = new Date(issued);
+      expiry.setFullYear(expiry.getFullYear() + 2);
+      const expirationDate = expiry.toISOString().slice(0, 10);
+
+      const certBlob = generateCertificatePdf({
+        acName: app.profiles?.ac_name,
+        qualificationName: app.qualifications?.name,
+        qualificationCode: app.qualifications?.code,
+        certNumber: app.cert_number,
+        issuanceDate,
+        expirationDate,
+      });
+      const aouBlob = generateAouPdf({
+        acName: app.profiles?.ac_name,
+        qualificationName: app.qualifications?.name,
+        qualificationCode: app.qualifications?.code,
+        certNumber: app.cert_number,
+      });
+
+      const certPath = `${user.id}/${id}/certificate-draft-${Date.now()}.pdf`;
+      const aouPath = `${user.id}/${id}/aou-draft-${Date.now()}.pdf`;
+
+      const { error: certUploadError } = await supabase.storage
+        .from("accreditation-files")
+        .upload(certPath, certBlob, { contentType: "application/pdf" });
+      if (certUploadError) throw certUploadError;
+      const { error: aouUploadError } = await supabase.storage
+        .from("accreditation-files")
+        .upload(aouPath, aouBlob, { contentType: "application/pdf" });
+      if (aouUploadError) throw aouUploadError;
+
+      const certUrl = supabase.storage.from("accreditation-files").getPublicUrl(certPath).data.publicUrl;
+      const aouUrl = supabase.storage.from("accreditation-files").getPublicUrl(aouPath).data.publicUrl;
+
+      const { error: updateError } = await supabase
+        .from("assessment_applications")
+        .update({
+          issuance_date: issuanceDate,
+          expiration_date: expirationDate,
+          cert_pdf_url: certUrl,
+          aou_pdf_url: aouUrl,
+        })
+        .eq("id", id);
+      if (updateError) throw updateError;
+
+      await logActivity(supabase, {
+        applicationId: id,
+        actorId: user.id,
+        actorName: profile?.ac_name,
+        action: "Certificate & AOU generated",
+        notes: `Issued ${issuanceDate}, expires ${expirationDate}`,
+      });
+
+      setIssuanceDate("");
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Notify the client that their draft certificate and AOU are ready and
+  // that payment + a signed AOU are needed next.
+  async function handleNotifyClient() {
+    setBusy(true);
+    setError("");
+    try {
+      const user = await currentAdmin();
+      await notifyUser(supabase, {
+        userId: app.user_id,
+        applicationId: id,
+        title: "Payment and AOU required",
+        message: `Your certificate for ${app.qualifications?.name} is ready for review. Please upload your receipt of payment and signed AOU.`,
+      });
+
+      const { error: updateError } = await supabase
+        .from("assessment_applications")
+        .update({ notified_at: new Date().toISOString() })
+        .eq("id", id);
+      if (updateError) throw updateError;
+
+      await logActivity(supabase, {
+        applicationId: id,
+        actorId: user.id,
+        actorName: profile?.ac_name,
+        action: "Client notified",
+        notes: "Payment and AOU required",
+      });
+
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Acknowledge or reject the uploaded receipt of payment / AOU
+  // independently of each other.
+  async function handleAcknowledge(kind) {
+    setBusy(true);
+    setError("");
+    try {
+      const user = await currentAdmin();
+      const patch =
+        kind === "receipt"
+          ? { receipt_status: "acknowledged", receipt_reject_reason: null }
+          : { aou_status: "acknowledged", aou_reject_reason: null };
+      const { error: updateError } = await supabase.from("payment_submissions").update(patch).eq("id", payment.id);
+      if (updateError) throw updateError;
+
+      await logActivity(supabase, {
+        applicationId: id,
+        actorId: user.id,
+        actorName: profile?.ac_name,
+        action: kind === "receipt" ? "Receipt of payment acknowledged" : "AOU acknowledged",
+      });
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleReject(kind) {
+    if (!rejectReason.trim()) {
+      setError("Add a reason so the applicant knows what to fix.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const user = await currentAdmin();
+      const patch =
+        kind === "receipt"
+          ? { receipt_status: "rejected", receipt_reject_reason: rejectReason }
+          : { aou_status: "rejected", aou_reject_reason: rejectReason };
+      const { error: updateError } = await supabase.from("payment_submissions").update(patch).eq("id", payment.id);
+      if (updateError) throw updateError;
+
+      await notifyUser(supabase, {
+        userId: app.user_id,
+        applicationId: id,
+        title: kind === "receipt" ? "Receipt of payment rejected" : "AOU rejected",
+        message: rejectReason,
+      });
+
+      await logActivity(supabase, {
+        applicationId: id,
+        actorId: user.id,
+        actorName: profile?.ac_name,
+        action: kind === "receipt" ? "Receipt of payment rejected" : "AOU rejected",
+        notes: rejectReason,
+      });
+
+      setRejectingKind(null);
+      setRejectReason("");
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Admin uploads the final, signed certificate ahead of release.
+  async function handleUploadSignedCert(e) {
+    e.preventDefault();
+    if (!signedCertFile) return;
+    setBusy(true);
+    setError("");
+    try {
+      const user = await currentAdmin();
+      const stored = `${user.id}/${id}/signed-certificate-${Date.now()}-${signedCertFile.name}`;
+      const { error: uploadError } = await supabase.storage.from("accreditation-files").upload(stored, signedCertFile);
+      if (uploadError) throw uploadError;
+      const signedUrl = supabase.storage.from("accreditation-files").getPublicUrl(stored).data.publicUrl;
+
+      const { error: updateError } = await supabase
+        .from("assessment_applications")
+        .update({ signed_cert_url: signedUrl })
+        .eq("id", id);
+      if (updateError) throw updateError;
+
+      await logActivity(supabase, {
+        applicationId: id,
+        actorId: user.id,
+        actorName: profile?.ac_name,
+        action: "Signed certificate uploaded",
+      });
+
+      setSignedCertFile(null);
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleReleaseCertificate() {
     setBusy(true);
     setError("");
     try {
       const user = await currentAdmin();
-      const today = new Date();
-      const expiry = new Date(today);
-      expiry.setFullYear(expiry.getFullYear() + 2);
 
       const { error: centerError } = await supabase.from("assessment_centers").insert({
         user_id: app.user_id,
         qualification_id: app.qualification_id,
         application_id: app.id,
         cert_number: app.cert_number || generateCertNumber(app.qualifications?.code),
-        issuance_date: today.toISOString().slice(0, 10),
-        expiration_date: expiry.toISOString().slice(0, 10),
+        issuance_date: app.issuance_date,
+        expiration_date: app.expiration_date,
+        cert_url: app.signed_cert_url,
         status: "active",
       });
       if (centerError) throw centerError;
@@ -300,6 +518,13 @@ export default function AdminApplicationDetailPage() {
         .update({ status: "accredited" })
         .eq("id", id);
       if (updateError) throw updateError;
+
+      await notifyUser(supabase, {
+        userId: app.user_id,
+        applicationId: id,
+        title: "Certificate released",
+        message: `Your certificate ${app.cert_number} for ${app.qualifications?.name} has been released.`,
+      });
 
       await logActivity(supabase, {
         applicationId: id,
@@ -326,6 +551,8 @@ export default function AdminApplicationDetailPage() {
   }
 
   const latestInspection = inspections[0];
+  const isCertificateStage = app.status === "awaiting_payment" || app.status === "certificate_processing";
+  const allAcknowledged = payment?.receipt_status === "acknowledged" && payment?.aou_status === "acknowledged";
 
   // Every file tied to this application, in one place: the original
   // application documents plus any inspection reports and payment/AOU
@@ -544,49 +771,221 @@ export default function AdminApplicationDetailPage() {
             </form>
           )}
 
-          {app.status === "awaiting_payment" && (
-            <div className="card space-y-4">
-              <h2 className="font-display text-lg font-semibold text-seal">Receipt of payment / AOU</h2>
+          {isCertificateStage && !app.issuance_date && (
+            <form onSubmit={handleGenerateCertificate} className="card space-y-4">
+              <h2 className="font-display text-lg font-semibold text-seal">Set issuance date</h2>
               <p className="text-sm text-ink/60">
                 Certificate number reserved: <span className="font-mono font-medium text-ink">{app.cert_number}</span>
               </p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="label">Issuance date</label>
+                  <input
+                    type="date"
+                    required
+                    className="input-field"
+                    value={issuanceDate}
+                    onChange={(e) => setIssuanceDate(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="label">Expiration date (auto)</label>
+                  <input
+                    className="input-field bg-mist/50"
+                    disabled
+                    value={
+                      issuanceDate
+                        ? (() => {
+                            const d = new Date(issuanceDate + "T00:00:00");
+                            d.setFullYear(d.getFullYear() + 2);
+                            return d.toISOString().slice(0, 10);
+                          })()
+                        : ""
+                    }
+                    placeholder="Pick an issuance date"
+                  />
+                </div>
+              </div>
+              <button type="submit" disabled={busy || !issuanceDate} className="btn-primary">
+                Generate certificate &amp; AOU
+              </button>
+            </form>
+          )}
+
+          {isCertificateStage && app.issuance_date && !app.notified_at && (
+            <div className="card space-y-4">
+              <h2 className="font-display text-lg font-semibold text-seal">Review generated documents</h2>
+              <p className="text-sm text-ink/60">
+                Issued {app.issuance_date} · Expires {app.expiration_date}
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <PdfViewer url={app.cert_pdf_url} title="Certificate of Accreditation (draft)" />
+                <PdfViewer url={app.aou_pdf_url} title="AOU (template)" />
+              </div>
+              <button disabled={busy} onClick={handleNotifyClient} className="btn-primary">
+                Notify client — payment &amp; AOU required
+              </button>
+            </div>
+          )}
+
+          {isCertificateStage && app.notified_at && !allAcknowledged && (
+            <div className="card space-y-4">
+              <h2 className="font-display text-lg font-semibold text-seal">Receipt of payment / AOU</h2>
+              <p className="text-sm text-ink/60">Client notified {new Date(app.notified_at).toLocaleString()}</p>
+
               <div className="grid gap-4 sm:grid-cols-2 text-sm">
                 <div className="rounded-seal border border-seal/10 p-4">
-                  <p className="mb-1 font-medium text-ink">Receipt of payment</p>
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="font-medium text-ink">Receipt of payment</p>
+                    {payment?.receipt_status && <StatusPill status={payment.receipt_status} />}
+                  </div>
                   {payment?.receipt_url ? (
-                    <a href={payment.receipt_url} target="_blank" className="font-medium text-moss">
-                      View →
-                    </a>
+                    <>
+                      <a href={payment.receipt_url} target="_blank" className="font-medium text-moss">
+                        View →
+                      </a>
+                      {payment.receipt_status === "pending" && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button
+                            disabled={busy}
+                            onClick={() => handleAcknowledge("receipt")}
+                            className="btn-secondary !px-3 !py-1.5 text-xs"
+                          >
+                            Acknowledge
+                          </button>
+                          <button
+                            disabled={busy}
+                            onClick={() => {
+                              setRejectingKind("receipt");
+                              setRejectReason("");
+                            }}
+                            className="btn-secondary !px-3 !py-1.5 text-xs !text-clay"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                      {payment.receipt_status === "rejected" && (
+                        <p className="mt-2 text-xs text-clay">Reason: {payment.receipt_reject_reason}</p>
+                      )}
+                    </>
                   ) : (
                     <p className="text-ink/50">Not yet uploaded</p>
                   )}
                 </div>
+
                 <div className="rounded-seal border border-seal/10 p-4">
-                  <p className="mb-1 font-medium text-ink">AOU</p>
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="font-medium text-ink">AOU</p>
+                    {payment?.aou_status && <StatusPill status={payment.aou_status} />}
+                  </div>
                   {payment?.aou_url ? (
-                    <a href={payment.aou_url} target="_blank" className="font-medium text-moss">
-                      View →
-                    </a>
+                    <>
+                      <a href={payment.aou_url} target="_blank" className="font-medium text-moss">
+                        View →
+                      </a>
+                      {payment.aou_status === "pending" && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button
+                            disabled={busy}
+                            onClick={() => handleAcknowledge("aou")}
+                            className="btn-secondary !px-3 !py-1.5 text-xs"
+                          >
+                            Acknowledge
+                          </button>
+                          <button
+                            disabled={busy}
+                            onClick={() => {
+                              setRejectingKind("aou");
+                              setRejectReason("");
+                            }}
+                            className="btn-secondary !px-3 !py-1.5 text-xs !text-clay"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                      {payment.aou_status === "rejected" && (
+                        <p className="mt-2 text-xs text-clay">Reason: {payment.aou_reject_reason}</p>
+                      )}
+                    </>
                   ) : (
                     <p className="text-ink/50">Not yet uploaded</p>
                   )}
                 </div>
               </div>
-              {payment?.receipt_url && payment?.aou_url ? (
-                <button disabled={busy} onClick={handleReleaseCertificate} className="btn-primary">
-                  Release approved certificate
-                </button>
-              ) : (
+
+              {rejectingKind && (
+                <div className="rounded-seal border border-clay/30 bg-clay/5 p-4">
+                  <label className="label">
+                    Reason for rejecting the {rejectingKind === "receipt" ? "receipt of payment" : "AOU"}
+                  </label>
+                  <textarea
+                    className="input-field mb-3"
+                    rows={2}
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                  />
+                  <div className="flex gap-3">
+                    <button disabled={busy} onClick={() => handleReject(rejectingKind)} className="btn-primary !bg-clay hover:!bg-clay/90">
+                      Confirm reject
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRejectingKind(null);
+                        setRejectReason("");
+                      }}
+                      className="btn-secondary"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {(!payment?.receipt_url || !payment?.aou_url) && (
                 <p className="text-xs text-ink/50">Waiting for the applicant to upload both documents.</p>
               )}
             </div>
           )}
 
+          {isCertificateStage && allAcknowledged && !app.signed_cert_url && (
+            <form onSubmit={handleUploadSignedCert} className="card space-y-4">
+              <h2 className="font-display text-lg font-semibold text-seal">Upload signed certificate</h2>
+              <p className="text-sm text-ink/60">
+                Both the receipt of payment and AOU have been acknowledged. Upload the signed certificate to
+                proceed to release.
+              </p>
+              <input
+                type="file"
+                accept="application/pdf,image/*"
+                required
+                className="input-field"
+                onChange={(e) => setSignedCertFile(e.target.files?.[0] || null)}
+              />
+              <button type="submit" disabled={busy || !signedCertFile} className="btn-primary">
+                Upload signed certificate
+              </button>
+            </form>
+          )}
+
+          {isCertificateStage && allAcknowledged && app.signed_cert_url && (
+            <div className="card space-y-4">
+              <h2 className="font-display text-lg font-semibold text-seal">Release</h2>
+              <PdfViewer url={app.signed_cert_url} title="Signed certificate" />
+              <button disabled={busy} onClick={handleReleaseCertificate} className="btn-primary">
+                Release approved certificate
+              </button>
+            </div>
+          )}
+
           {app.status === "accredited" && (
-            <div className="card border-moss/30 bg-moss/5 text-center">
+            <div className="card border-moss/30 bg-moss/5 space-y-3">
               <p className="font-display text-lg font-semibold text-moss">
                 Accredited — certificate {app.cert_number} released
               </p>
+              <PdfViewer url={app.signed_cert_url || app.cert_pdf_url} title="Certificate of Accreditation" />
             </div>
           )}
         </div>

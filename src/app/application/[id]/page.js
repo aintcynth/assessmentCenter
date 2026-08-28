@@ -8,6 +8,7 @@ import ClientShell from "@/components/ClientShell";
 import StatusPill from "@/components/StatusPill";
 import Trailsheet from "@/components/Trailsheet";
 import DocumentTypeTag from "@/components/DocumentTypeTag";
+import PdfViewer from "@/components/PdfViewer";
 
 // Client-only Supabase calls happen at render time, so skip static
 // prerendering (which runs at build time, before env vars may be wired up).
@@ -178,8 +179,18 @@ export default function ApplicationDetailPage() {
 
       const patch =
         kind === "receipt"
-          ? { receipt_url: publicUrl.publicUrl, receipt_uploaded_at: new Date().toISOString() }
-          : { aou_url: publicUrl.publicUrl, aou_uploaded_at: new Date().toISOString() };
+          ? {
+              receipt_url: publicUrl.publicUrl,
+              receipt_uploaded_at: new Date().toISOString(),
+              receipt_status: "pending",
+              receipt_reject_reason: null,
+            }
+          : {
+              aou_url: publicUrl.publicUrl,
+              aou_uploaded_at: new Date().toISOString(),
+              aou_status: "pending",
+              aou_reject_reason: null,
+            };
 
       const { error: upsertError } = await supabase
         .from("payment_submissions")
@@ -212,6 +223,7 @@ export default function ApplicationDetailPage() {
   }
 
   const latestInspection = inspections[0];
+  const isCertificateStage = app.status === "awaiting_payment" || app.status === "certificate_processing";
 
   const allFiles = [
     ...documents.map((d) => ({
@@ -337,96 +349,117 @@ export default function ApplicationDetailPage() {
             </div>
           )}
 
-          {app.status === "awaiting_payment" && (
+          {isCertificateStage && !app.notified_at && (
+            <div className="card">
+              <h2 className="mb-2 font-display text-lg font-semibold text-seal">Compliant — certificate in progress</h2>
+              <p className="text-sm text-ink/60">
+                Your inspection passed. The admin is preparing your certificate and AOU — you'll be notified here
+                once payment and AOU are needed.
+              </p>
+            </div>
+          )}
+
+          {isCertificateStage && app.notified_at && (
             <div className="card space-y-4">
-              <h2 className="font-display text-lg font-semibold text-seal">Compliant — final steps</h2>
-              {latestInspection?.report_url && (
-                <a
-                  href={latestInspection.report_url}
-                  target="_blank"
-                  className="inline-block text-sm font-semibold text-seal hover:text-brass"
-                >
-                  View signed inspection report →
-                </a>
-              )}
+              <h2 className="font-display text-lg font-semibold text-seal">Payment &amp; AOU required</h2>
+              <p className="text-sm text-ink/60">
+                Issued {app.issuance_date} · Expires {app.expiration_date}
+              </p>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <PdfViewer url={app.cert_pdf_url} title="Certificate of Accreditation (draft)" height={360} />
+                <PdfViewer url={app.aou_pdf_url} title="AOU (template — print, sign, and upload below)" height={360} />
+              </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="rounded-seal border border-seal/10 p-4">
-                  <p className="mb-2 text-sm font-medium text-ink">Receipt of payment</p>
-                  {payment?.receipt_url ? (
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-sm font-medium text-ink">Receipt of payment</p>
+                    {payment?.receipt_status && <StatusPill status={payment.receipt_status} />}
+                  </div>
+                  {payment?.receipt_url && payment.receipt_status !== "rejected" ? (
                     <a href={payment.receipt_url} target="_blank" className="text-sm font-medium text-moss">
                       Uploaded — view →
                     </a>
                   ) : (
-                    <div className="flex gap-2">
-                      <input
-                        type="file"
-                        className="input-field"
-                        onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
-                      />
-                      <button
-                        disabled={busy || !receiptFile}
-                        onClick={() => uploadPaymentFile(receiptFile, "receipt")}
-                        className="btn-secondary shrink-0"
-                      >
-                        Upload
-                      </button>
-                    </div>
+                    <>
+                      {payment?.receipt_status === "rejected" && (
+                        <p className="mb-2 text-xs text-clay">Rejected: {payment.receipt_reject_reason}</p>
+                      )}
+                      <div className="flex gap-2">
+                        <input
+                          type="file"
+                          className="input-field"
+                          onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
+                        />
+                        <button
+                          disabled={busy || !receiptFile}
+                          onClick={() => uploadPaymentFile(receiptFile, "receipt")}
+                          className="btn-secondary shrink-0"
+                        >
+                          Upload
+                        </button>
+                      </div>
+                    </>
                   )}
                 </div>
                 <div className="rounded-seal border border-seal/10 p-4">
-                  <p className="mb-2 text-sm font-medium text-ink">AOU</p>
-                  {payment?.aou_url ? (
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-sm font-medium text-ink">AOU</p>
+                    {payment?.aou_status && <StatusPill status={payment.aou_status} />}
+                  </div>
+                  {payment?.aou_url && payment.aou_status !== "rejected" ? (
                     <a href={payment.aou_url} target="_blank" className="text-sm font-medium text-moss">
                       Uploaded — view →
                     </a>
                   ) : (
-                    <div className="flex gap-2">
-                      <input
-                        type="file"
-                        className="input-field"
-                        onChange={(e) => setAouFile(e.target.files?.[0] || null)}
-                      />
-                      <button
-                        disabled={busy || !aouFile}
-                        onClick={() => uploadPaymentFile(aouFile, "aou")}
-                        className="btn-secondary shrink-0"
-                      >
-                        Upload
-                      </button>
-                    </div>
+                    <>
+                      {payment?.aou_status === "rejected" && (
+                        <p className="mb-2 text-xs text-clay">Rejected: {payment.aou_reject_reason}</p>
+                      )}
+                      <div className="flex gap-2">
+                        <input
+                          type="file"
+                          className="input-field"
+                          onChange={(e) => setAouFile(e.target.files?.[0] || null)}
+                        />
+                        <button
+                          disabled={busy || !aouFile}
+                          onClick={() => uploadPaymentFile(aouFile, "aou")}
+                          className="btn-secondary shrink-0"
+                        >
+                          Upload
+                        </button>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
 
-              {payment?.receipt_url && payment?.aou_url && (
+              {payment?.receipt_status === "acknowledged" && payment?.aou_status === "acknowledged" && (
                 <p className="text-sm text-moss">
-                  Both documents received. Waiting for the admin to release your certificate.
+                  Both documents acknowledged. Waiting for the admin to upload your signed certificate and release it.
                 </p>
               )}
             </div>
           )}
 
           {app.status === "accredited" && (
-            <div className="card border-moss/30 bg-moss/5">
+            <div className="card border-moss/30 bg-moss/5 space-y-3">
               <h2 className="font-display text-lg font-semibold text-moss">Accredited</h2>
               {center ? (
-                <div className="mt-3 space-y-1 text-sm">
+                <div className="space-y-1 text-sm">
                   <p>
                     Certificate <span className="font-mono font-medium">{center.cert_number}</span>
                   </p>
                   <p className="text-ink/60">
                     Issued {center.issuance_date} · Expires {center.expiration_date}
                   </p>
-                  {center.cert_url && (
-                    <a href={center.cert_url} target="_blank" className="inline-block font-semibold text-seal hover:text-brass">
-                      View certificate →
-                    </a>
-                  )}
                 </div>
               ) : (
-                <p className="mt-2 text-sm text-ink/60">Certificate details are being finalized.</p>
+                <p className="text-sm text-ink/60">Certificate details are being finalized.</p>
               )}
+              <PdfViewer url={center?.cert_url || app.signed_cert_url || app.cert_pdf_url} title="Certificate of Accreditation" />
             </div>
           )}
 

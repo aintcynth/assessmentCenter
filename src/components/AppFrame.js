@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Search, LogOut, Menu, X, ChevronsLeft, ChevronsRight } from "lucide-react";
+import NotificationBell from "@/components/NotificationBell";
 
 function initials(name) {
   if (!name) return "?";
@@ -157,6 +158,7 @@ export default function AppFrame({ brandLabel, brandSub, navLinks, name, roleLab
           </div>
 
           <div className="ml-auto flex items-center gap-3">
+            <NotificationBell />
             <div className="hidden text-right sm:block">
               <p className="text-sm font-semibold leading-tight text-ink">{name || "—"}</p>
               <p className="text-xs leading-tight text-ink/40">{roleLabel}</p>

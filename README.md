@@ -40,11 +40,30 @@ existing phpMyAdmin/MariaDB dump — see [`supabase/schema.sql`](./supabase/sche
      `inspections` row) — this can repeat as many times as needed.
    - **Compliant**: a certificate number is reserved on the application
      (`cert_number`) and the status moves to `awaiting_payment`.
-5. **Payment / AOU** — the client uploads a receipt of payment and an AOU
-   (Affidavit of Undertaking) into `payment_submissions`.
-6. **Certificate release** — once both are in, the admin releases the
-   certificate: this creates the `assessment_centers` row and flips the
-   application to `status = 'accredited'`.
+5. **Compliance check** — after the visit, the admin uploads the signed
+   inspection report and marks the inspection compliant or not.
+   - **Non-compliant**: lackings are recorded on that `inspections` row: the
+     client sees them, and the admin schedules a **reinspection** (a new
+     `inspections` row) — this can repeat as many times as needed.
+   - **Compliant**: a certificate number is reserved on the application
+     (`cert_number`) and the status moves to `certificate_processing`.
+6. **Issuance & document generation** — the admin sets an issuance date
+   (expiry auto-computes as +2 years); the app generates a draft
+   Certificate of Accreditation and a blank AOU template as PDFs
+   (`jspdf`, entirely client-side) and uploads both to storage.
+7. **Review & notify** — the admin reviews both PDFs in an inline viewer,
+   then notifies the client (an in-app notification, plus `notified_at` on
+   the application).
+8. **Payment / AOU upload & review** — the client uploads a receipt of
+   payment and a signed AOU. The admin acknowledges or rejects each
+   independently; a rejection requires a reason, notifies the client, and
+   resets that document to `pending` so the client can re-upload.
+9. **Signed certificate & release** — once both documents are acknowledged,
+   the admin uploads the physically signed certificate, reviews it in the
+   PDF viewer, and releases it: this creates the `assessment_centers` row
+   (using the signed certificate as `cert_url`) and flips the application to
+   `status = 'accredited'`. The client is notified and can view the final
+   certificate inline.
 
 Every step above writes a row to `application_activity_log` (the
 "trailsheet") — visible to both the client and the admin on the
@@ -81,10 +100,10 @@ Notes on the migration:
    — for a **brand-new** project only. It creates every table, RLS policy,
    and seeds the full NC qualification catalog.
    - If you already have this project running from an earlier version,
-     instead run [`supabase/002_inspection_workflow.sql`](./supabase/002_inspection_workflow.sql),
-     which additively creates the `inspections`, `payment_submissions`, and
-     `application_activity_log` tables and widens `assessment_applications.status`
-     without touching your existing data.
+     instead run [`supabase/002_inspection_workflow.sql`](./supabase/002_inspection_workflow.sql)
+     followed by [`supabase/003_certificate_pipeline.sql`](./supabase/003_certificate_pipeline.sql),
+     which additively add everything from the inspection cycle through
+     certificate issuance without touching your existing data.
 3. In **Project Settings → API**, copy the **Project URL** and **anon public
    key**.
 4. To create your first administrator: sign up normally through the app,

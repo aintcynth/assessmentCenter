@@ -54,9 +54,15 @@ create table if not exists public.assessment_applications (
   user_id uuid not null references public.profiles (id) on delete cascade,
   qualification_id integer not null references public.qualifications (id),
   status text not null default 'pending' check (
-    status in ('pending', 'denied', 'inspection_scheduled', 'awaiting_payment', 'accredited')
+    status in ('pending', 'denied', 'inspection_scheduled', 'certificate_processing', 'accredited')
   ),
   cert_number text,
+  issuance_date date,
+  expiration_date date,
+  cert_pdf_url text,      -- system-generated draft certificate
+  aou_pdf_url text,       -- system-generated blank AOU template
+  signed_cert_url text,   -- admin-uploaded signed certificate (final)
+  notified_at timestamptz, -- when the client was notified about payment/AOU
   admin_reason text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -104,8 +110,26 @@ create table if not exists public.payment_submissions (
   application_id uuid not null unique references public.assessment_applications (id) on delete cascade,
   receipt_url text,
   receipt_uploaded_at timestamptz,
+  receipt_status text default 'pending' check (receipt_status in ('pending', 'acknowledged', 'rejected')),
+  receipt_reject_reason text,
   aou_url text,
   aou_uploaded_at timestamptz,
+  aou_status text default 'pending' check (aou_status in ('pending', 'acknowledged', 'rejected')),
+  aou_reject_reason text,
+  created_at timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------------
+-- 6b. Notifications — simple in-app inbox used to notify the client (and
+--     vice versa) at each handoff point.
+-- ---------------------------------------------------------------------------
+create table if not exists public.notifications (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  application_id uuid references public.assessment_applications (id) on delete cascade,
+  title text not null,
+  message text,
+  read boolean not null default false,
   created_at timestamptz not null default now()
 );
 
@@ -149,6 +173,7 @@ alter table public.assessment_applications enable row level security;
 alter table public.assessment_application_documents enable row level security;
 alter table public.inspections enable row level security;
 alter table public.payment_submissions enable row level security;
+alter table public.notifications enable row level security;
 alter table public.application_activity_log enable row level security;
 alter table public.assessment_centers enable row level security;
 
@@ -210,7 +235,25 @@ create policy "payment_insert" on public.payment_submissions for insert with che
   exists (select 1 from public.assessment_applications a where a.id = application_id and a.user_id = auth.uid())
 );
 create policy "payment_update" on public.payment_submissions for update using (
-  exists (select 1 from public.assessment_applications a where a.id = application_id and a.user_id = auth.uid())
+  public.is_admin() or exists (select 1 from public.assessment_applications a where a.id = application_id and a.user_id = auth.uid())
+);
+
+-- Notifications: recipient (or admin) reads/marks read; admin can notify
+-- anyone, a client can notify about their own application (e.g. flagging
+-- the admin when they upload something)
+create policy "notifications_select" on public.notifications for select using (
+  user_id = auth.uid() or public.is_admin()
+);
+create policy "notifications_update" on public.notifications for update using (
+  user_id = auth.uid() or public.is_admin()
+);
+create policy "notifications_insert" on public.notifications for insert with check (
+  public.is_admin()
+  or user_id = auth.uid()
+  or exists (
+    select 1 from public.assessment_applications a
+    where a.id = application_id and a.user_id = auth.uid()
+  )
 );
 
 -- Activity log (trailsheet): owner + admin read; either can append entries

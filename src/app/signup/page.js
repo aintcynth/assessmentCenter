@@ -11,6 +11,8 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [acManager, setAcManager] = useState("");
+  const [acType, setAcType] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -25,7 +27,7 @@ export default function SignupPage() {
     const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { ac_name: acName, phone, address, role: "user" } },
+      options: { data: { ac_name: acName, phone, address, ac_manager: acManager, ac_type: acType, role: "user" } },
     });
     setLoading(false);
     if (signUpError) {
@@ -92,6 +94,31 @@ export default function SignupPage() {
               onChange={(e) => setAddress(e.target.value)}
               placeholder="Street, City, Province"
             />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="label" htmlFor="acManager">AC Manager</label>
+              <input
+                id="acManager"
+                className="input-field"
+                value={acManager}
+                onChange={(e) => setAcManager(e.target.value)}
+                placeholder="Manager's full name"
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="acType">AC Type</label>
+              <select
+                id="acType"
+                className="input-field"
+                value={acType}
+                onChange={(e) => setAcType(e.target.value)}
+              >
+                <option value="">Select…</option>
+                <option value="TTI">TTI</option>
+                <option value="TVI">TVI</option>
+              </select>
+            </div>
           </div>
           <div>
             <label className="label" htmlFor="password">Password</label>

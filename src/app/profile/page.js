@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export default function ProfilePage() {
   const supabase = createClient();
   const [profile, setProfile] = useState(null);
-  const [form, setForm] = useState({ ac_name: "", phone: "", address: "" });
+  const [form, setForm] = useState({ ac_name: "", phone: "", address: "", ac_manager: "", ac_type: "" });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -27,6 +27,8 @@ export default function ProfilePage() {
         ac_name: p?.ac_name || "",
         phone: p?.phone || "",
         address: p?.address || "",
+        ac_manager: p?.ac_manager || "",
+        ac_type: p?.ac_type || "",
       });
     }
     load();
@@ -78,6 +80,29 @@ export default function ProfilePage() {
             value={form.address}
             onChange={(e) => setForm({ ...form, address: e.target.value })}
           />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="label">AC Manager</label>
+            <input
+              className="input-field"
+              value={form.ac_manager}
+              onChange={(e) => setForm({ ...form, ac_manager: e.target.value })}
+              placeholder="Manager's full name"
+            />
+          </div>
+          <div>
+            <label className="label">AC Type</label>
+            <select
+              className="input-field"
+              value={form.ac_type}
+              onChange={(e) => setForm({ ...form, ac_type: e.target.value })}
+            >
+              <option value="">Select…</option>
+              <option value="TTI">TTI</option>
+              <option value="TVI">TVI</option>
+            </select>
+          </div>
         </div>
         {saved && <p className="text-sm text-moss">Profile updated.</p>}
         <div className="flex justify-end">

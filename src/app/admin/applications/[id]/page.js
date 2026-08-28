@@ -58,7 +58,7 @@ export default function AdminApplicationDetailPage() {
 
     const { data: application } = await supabase
       .from("assessment_applications")
-      .select("*, profiles:user_id(ac_name, email, phone, address), qualifications:qualification_id(*)")
+      .select("*, profiles:user_id(ac_name, email, phone, address, ac_manager, ac_type), qualifications:qualification_id(*)")
       .eq("id", id)
       .single();
     setApp(application);
@@ -299,8 +299,8 @@ export default function AdminApplicationDetailPage() {
 
       const certBlob = generateCertificatePdf({
         acName: app.profiles?.ac_name,
+        address: app.profiles?.address,
         qualificationName: app.qualifications?.name,
-        qualificationCode: app.qualifications?.code,
         certNumber: app.cert_number,
         issuanceDate,
         expirationDate,
@@ -999,6 +999,20 @@ export default function AdminApplicationDetailPage() {
             <p className="text-sm text-ink/60">{app.profiles?.email}</p>
             <p className="text-sm text-ink/60">{app.profiles?.phone}</p>
             <p className="text-sm text-ink/60">{app.profiles?.address}</p>
+            {(app.profiles?.ac_manager || app.profiles?.ac_type) && (
+              <div className="mt-3 space-y-1 border-t border-seal/10 pt-3 text-sm">
+                {app.profiles?.ac_manager && (
+                  <p className="text-ink/60">
+                    <span className="text-ink/40">AC Manager:</span> {app.profiles.ac_manager}
+                  </p>
+                )}
+                {app.profiles?.ac_type && (
+                  <p className="text-ink/60">
+                    <span className="text-ink/40">AC Type:</span> {app.profiles.ac_type}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="card">

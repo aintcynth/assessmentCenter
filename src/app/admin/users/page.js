@@ -53,6 +53,8 @@ export default function AdminUsersPage() {
               <tr className="border-b border-seal/10 text-left text-xs uppercase tracking-wider text-ink/50">
                 <th className="pb-3 pr-4 font-medium">Name</th>
                 <th className="pb-3 pr-4 font-medium">Email</th>
+                <th className="pb-3 pr-4 font-medium">AC Manager</th>
+                <th className="pb-3 pr-4 font-medium">AC Type</th>
                 <th className="pb-3 pr-4 font-medium">Role</th>
                 <th className="pb-3 font-medium"></th>
               </tr>
@@ -62,6 +64,8 @@ export default function AdminUsersPage() {
                 <tr key={u.id}>
                   <td className="py-3 pr-4 font-medium text-ink">{u.ac_name || "—"}</td>
                   <td className="py-3 pr-4 text-ink/70">{u.email}</td>
+                  <td className="py-3 pr-4 text-ink/70">{u.ac_manager || "—"}</td>
+                  <td className="py-3 pr-4 text-ink/70">{u.ac_type || "—"}</td>
                   <td className="py-3 pr-4">
                     <span
                       className={`status-pill ${

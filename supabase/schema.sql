@@ -27,6 +27,8 @@ create table if not exists public.profiles (
   email text,
   phone text,
   address text,
+  ac_manager text,                        -- assessment center manager's name
+  ac_type text check (ac_type in ('TTI', 'TVI')),
   role text not null default 'user' check (role in ('user', 'admin')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -284,13 +286,15 @@ language plpgsql
 security definer
 as $$
 begin
-  insert into public.profiles (id, email, ac_name, phone, address, role)
+  insert into public.profiles (id, email, ac_name, phone, address, ac_manager, ac_type, role)
   values (
     new.id,
     new.email,
     coalesce(new.raw_user_meta_data ->> 'ac_name', ''),
     new.raw_user_meta_data ->> 'phone',
     new.raw_user_meta_data ->> 'address',
+    new.raw_user_meta_data ->> 'ac_manager',
+    new.raw_user_meta_data ->> 'ac_type',
     coalesce(new.raw_user_meta_data ->> 'role', 'user')
   );
   return new;

@@ -101,7 +101,8 @@ Notes on the migration:
    and seeds the full NC qualification catalog.
    - If you already have this project running from an earlier version,
      instead run [`supabase/002_inspection_workflow.sql`](./supabase/002_inspection_workflow.sql)
-     followed by [`supabase/003_certificate_pipeline.sql`](./supabase/003_certificate_pipeline.sql),
+     followed by [`supabase/003_certificate_pipeline.sql`](./supabase/003_certificate_pipeline.sql)
+     and [`supabase/004_ac_profile_fields.sql`](./supabase/004_ac_profile_fields.sql),
      which additively add everything from the inspection cycle through
      certificate issuance without touching your existing data.
 3. In **Project Settings → API**, copy the **Project URL** and **anon public

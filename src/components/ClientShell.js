@@ -7,7 +7,7 @@ import AppFrame from "@/components/AppFrame";
 
 const LINKS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/apply", label: "Apply for scholarship", icon: ClipboardList },
+  { href: "/apply", label: "Apply as AC", icon: ClipboardList },
   { href: "/accredited", label: "Accredited", icon: Award },
   { href: "/documents", label: "Documents", icon: FolderOpen },
   { href: "/profile", label: "Profile", icon: UserCircle },

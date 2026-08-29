@@ -31,7 +31,7 @@ export default async function DashboardPage() {
           </h1>
         </div>
         <Link href="/apply" className="btn-primary">
-          Apply for scholarship
+          Apply for larlarship
         </Link>
       </div>
 
@@ -63,11 +63,11 @@ export default async function DashboardPage() {
         {apps.length === 0 ? (
           <div className="rounded-seal border border-dashed border-seal/20 px-6 py-10 text-center">
             <p className="text-sm text-ink/60">
-              You haven't started an application yet. Apply for scholarship to pick a qualification and begin
+              You haven't started an application yet. Apply as AC to pick a qualification and begin
               accreditation.
             </p>
             <Link href="/apply" className="btn-primary mt-4 inline-flex">
-              Apply for scholarship
+              Apply as AC
             </Link>
           </div>
         ) : (

@@ -802,8 +802,13 @@ export default function AdminApplicationDetailPage() {
                       issuanceDate
                         ? (() => {
                             const d = new Date(issuanceDate + "T00:00:00");
-                            d.setFullYear(d.getFullYear() + 2);
-                            return d.toISOString().slice(0, 10);
+                            d.setFullYear(d.getFullYear() + 2); // Adds exactly 2 years
+
+                            const month = String(d.getMonth() + 1).padStart(2, '0');
+                            const day = String(d.getDate()).padStart(2, '0');
+                            const year = d.getFullYear();
+
+                            return `${month}/${day}/${year}`; // Returns mm/dd/yyyy
                           })()
                         : ""
                     }

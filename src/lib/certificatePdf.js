@@ -200,46 +200,156 @@ export function generateCertificatePdf({
   return doc.output("blob");
 }
 
-// Generates a blank Affidavit of Undertaking template (portrait) with the
-// applicant's details pre-filled and signature lines for them to sign and
-// upload back.
-export function generateAouPdf({ acName, qualificationName, qualificationCode, certNumber }) {
+// Generates the Affidavit of Undertaking (TESDA-OP-CO-03-F10) — a legal
+// jurat-style document the AC manager signs and has notarized, listing the
+// twelve standard undertakings. AC name, address, manager, and qualification
+// are filled in; everything else follows the official template verbatim.
+export function generateAouPdf({ acName, address, acManager, qualificationName }) {
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
   const w = doc.internal.pageSize.getWidth();
-  const margin = 60;
+  const h = doc.internal.pageSize.getHeight();
+  const margin = 50;
+  const contentWidth = w - margin * 2;
+  let y = margin;
 
-  doc.setFont("times", "bold");
-  doc.setFontSize(18);
-  doc.setTextColor(12, 46, 78);
-  doc.text("AFFIDAVIT OF UNDERTAKING", w / 2, 80, { align: "center" });
+  function ensureSpace(next) {
+    if (y + next > h - margin) {
+      doc.addPage();
+      y = margin;
+    }
+  }
 
-  doc.setFont("times", "normal");
-  doc.setFontSize(11);
-  doc.setTextColor(30, 30, 30);
+  function paragraph(text, { size = 9.5, bold = false, gapAfter = 12, lineHeight = 13 } = {}) {
+    doc.setFont("helvetica", bold ? "bold" : "normal");
+    doc.setFontSize(size);
+    const lines = doc.splitTextToSize(text, contentWidth);
+    lines.forEach((line) => {
+      ensureSpace(lineHeight);
+      doc.text(line, margin, y);
+      y += lineHeight;
+    });
+    y += gapAfter;
+  }
 
-  const paragraph =
-    `I, the undersigned, representing ${acName || "the applicant"}, in connection with the application for ` +
-    `accreditation as an Assessment Center for ${qualificationName || "the qualification"} (${qualificationCode || ""}, ` +
-    `Certificate No. ${certNumber || "pending"}), do hereby undertake and commit to the following:\n\n` +
-    `1. To comply with all applicable rules, regulations, and standards governing accredited assessment centers.\n\n` +
-    `2. To maintain the facilities, equipment, and qualified personnel represented in this application throughout ` +
-    `the period of accreditation.\n\n` +
-    `3. To submit to periodic monitoring and re-inspection as may be required.\n\n` +
-    `4. To immediately report any material change in the center's operations, ownership, or qualified personnel.\n\n` +
-    `5. To use the accreditation and certificate solely for the qualification and center named above.\n\n` +
-    `IN WITNESS WHEREOF, I have hereunto set my hand this ____ day of ______________, 20____.`;
+  // Form code, above the content, right-aligned.
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8.5);
+  doc.text("TESDA-OP-CO-03-F10", w - margin, margin - 24, { align: "right" });
+  doc.setFont("helvetica", "normal");
+  doc.text("Rev. No.00-03/08/17", w - margin, margin - 14, { align: "right" });
 
-  const lines = doc.splitTextToSize(paragraph, w - margin * 2);
-  doc.text(lines, margin, 130);
+  // Jurat heading, right-aligned.
+  doc.setFontSize(9.5);
+  doc.text("Republic of the Philippines)", w - margin, y, { align: "right" });
+  y += 13;
+  doc.text("In the City of _________)      s.s.", w - margin, y, { align: "right" });
+  y += 26;
 
-  const sigY = 130 + lines.length * 15 + 60;
-  doc.setDrawColor(80, 80, 80);
-  doc.line(margin, sigY, margin + 220, sigY);
+  // Title.
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text("AFFIDAVIT OF UNDERTAKING", w / 2, y, { align: "center" });
+  y += 16;
+  doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
-  doc.text("Signature over printed name", margin, sigY + 16);
+  doc.text("(Assessment Center)", w / 2, y, { align: "center" });
+  y += 26;
 
-  doc.line(w - margin - 180, sigY, w - margin, sigY);
-  doc.text("Date signed", w - margin - 180, sigY + 16);
+  const blank = "____________________";
+
+  paragraph(
+    `${acName || blank}, ${address || blank}, represented by its Assessment Center Manager, ${acManager || blank}, ` +
+      `having been sworn to in accordance with law, do hereby depose and state that:`,
+    { gapAfter: 16 }
+  );
+
+  paragraph(
+    `The Competency Assessment Center shall comply with the following terms and conditions, violations of any of ` +
+      `those mentioned below shall be ground for the cancellation/revocation/withdrawal of accreditation:`,
+    { gapAfter: 10 }
+  );
+
+  const items = [
+    `Provide quality assessment in ${qualificationName || blank};`,
+    `Maintain facilities of the Assessment Center as prescribed by TESDA;`,
+    `Ensure that the conduct of competency assessment is strictly in accordance with the provisions on the ` +
+      `Procedures Manual on Competency Assessment and other assessment-related issuances;`,
+    `Collect competency assessment fees prescribed by TESDA;`,
+    `Sustain compliance with accreditation requirements;`,
+    `Notify TESDA of any change that directly or indirectly affect assessment conditions in relation to the ` +
+      `conditions existing during the original accreditation;`,
+    `Safeguard/Ensure the authenticity, validity and confidentiality of all documents relative to the conduct of ` +
+      `competency assessment;`,
+    `Assume full responsibility for ensuring the objectivity and integrity of assessment conducted in the ` +
+      `Assessment Center and by the Competency Assessor;`,
+    `Submit schedule of assessment to Provincial Office;`,
+    `Submit post assessment results and reports immediately after the conduct of assessment;`,
+    `Ensure that assessors listed in the Registry of Accredited Competency Assessors are assigned on a rotation ` +
+      `basis and are given equal number of assignment; and`,
+    `No involvement with any "Conflict of Interest" activity related to assessment and certification program ` +
+      `e.g., Placement/Recruitment Agency, Review Center, among others.`,
+  ];
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9.5);
+  const indent = 16;
+  items.forEach((item, i) => {
+    const wrapped = doc.splitTextToSize(item, contentWidth - indent);
+    wrapped.forEach((line, li) => {
+      ensureSpace(13);
+      doc.text(li === 0 ? `${i + 1}. ${line}` : line, margin + (li === 0 ? 0 : indent), y);
+      y += 13;
+    });
+    y += 4;
+  });
+
+  y += 8;
+  const year = new Date().getFullYear();
+  paragraph(
+    `IN WITNESS WHEREOF, I have hereunto affixed my signature this ____ day of ________, ${year} at ` +
+      `_______________, Cagayan, Philippines.`,
+    { gapAfter: 34 }
+  );
+
+  // Signature block, centered.
+  ensureSpace(40);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.text(acManager || blank, w / 2, y, { align: "center" });
+  y += 13;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9.5);
+  doc.text("Affiant", w / 2, y, { align: "center" });
+  y += 24;
+
+  ensureSpace(40);
+  doc.text("Government Issued ID No: ________________", margin, y);
+  y += 16;
+  doc.text("Date Issued: ___________________________", margin, y);
+  y += 28;
+
+  paragraph(
+    `SUBSCRIBED AND SWORN to before me, this ____ day of _________, 20____, affiant exhibiting to me the ` +
+      `above-stated government-issued identification card.`,
+    { gapAfter: 18 }
+  );
+
+  // Doc/Page/Book/Series (left) and notary signature line (right).
+  ensureSpace(80);
+  const leftX = margin;
+  const rightX = w / 2 + 30;
+  const rightLineWidth = w - margin - rightX;
+
+  doc.line(rightX, y, rightX + rightLineWidth, y);
+  doc.setFontSize(9.5);
+  doc.text("Doc. No.: ____________", leftX, y + 14);
+  doc.setFont("helvetica", "bold");
+  doc.text("NOTARY PUBLIC", rightX + rightLineWidth / 2, y + 14, { align: "center" });
+  doc.setFont("helvetica", "normal");
+
+  doc.text("Page No.: ___________", leftX, y + 30);
+  doc.text("Book No.: ___________", leftX, y + 46);
+  doc.text("Series No.: ___________", leftX, y + 62);
 
   return doc.output("blob");
 }

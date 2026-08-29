@@ -312,9 +312,9 @@ export default function AdminApplicationDetailPage() {
       });
       const aouBlob = generateAouPdf({
         acName: app.profiles?.ac_name,
+        address: app.profiles?.address,
+        acManager: app.profiles?.ac_manager,
         qualificationName: app.qualifications?.name,
-        qualificationCode: app.qualifications?.code,
-        certNumber: app.cert_number,
       });
 
       const certPath = `${user.id}/${id}/certificate-draft-${Date.now()}.pdf`;

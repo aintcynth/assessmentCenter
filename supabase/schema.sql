@@ -136,6 +136,17 @@ create table if not exists public.notifications (
 );
 
 -- ---------------------------------------------------------------------------
+-- 6c. App settings — single row holding the certificate logo.
+-- ---------------------------------------------------------------------------
+create table if not exists public.app_settings (
+  id smallint primary key default 1,
+  logo_url text,
+  updated_at timestamptz not null default now(),
+  constraint app_settings_singleton check (id = 1)
+);
+insert into public.app_settings (id) values (1) on conflict (id) do nothing;
+
+-- ---------------------------------------------------------------------------
 -- 7. Application activity log ("trailsheet") — a timestamped record of what
 --    happened and when, per the handwritten note on the admin flowchart.
 -- ---------------------------------------------------------------------------
@@ -176,6 +187,7 @@ alter table public.assessment_application_documents enable row level security;
 alter table public.inspections enable row level security;
 alter table public.payment_submissions enable row level security;
 alter table public.notifications enable row level security;
+alter table public.app_settings enable row level security;
 alter table public.application_activity_log enable row level security;
 alter table public.assessment_centers enable row level security;
 
@@ -257,6 +269,12 @@ create policy "notifications_insert" on public.notifications for insert with che
     where a.id = application_id and a.user_id = auth.uid()
   )
 );
+
+-- App settings: any signed-in user can read (used to fetch the logo),
+-- only admin can write
+create policy "app_settings_select" on public.app_settings for select using (auth.uid() is not null);
+create policy "app_settings_admin_update" on public.app_settings for update using (public.is_admin());
+create policy "app_settings_admin_insert" on public.app_settings for insert with check (public.is_admin());
 
 -- Activity log (trailsheet): owner + admin read; either can append entries
 -- tied to their own application

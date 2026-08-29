@@ -64,6 +64,7 @@ export function generateCertificatePdf({
   certNumber,
   issuanceDate,
   expirationDate,
+  logo, // optional { dataUrl, width, height } from loadImageAsPngDataUrl
 }) {
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
   const w = doc.internal.pageSize.getWidth();
@@ -84,18 +85,27 @@ export function generateCertificatePdf({
   doc.setLineWidth(1.3);
   doc.rect(margin, margin, w - margin * 2, doc.internal.pageSize.getHeight() - margin * 2);
 
-  // Seal placeholder (a real logo image can be swapped in via addImage).
+  // Seal — a real logo if one's been uploaded in Admin > Settings,
+  // otherwise a vector placeholder so the certificate still looks complete.
   const sealY = margin + 78;
-  doc.setDrawColor(12, 46, 78);
-  doc.setLineWidth(1.4);
-  doc.circle(w / 2, sealY, 30, "S");
-  doc.setDrawColor(200, 160, 40);
-  doc.setLineWidth(0.8);
-  doc.circle(w / 2, sealY, 24, "S");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(12, 46, 78);
-  doc.text("TESDA", w / 2, sealY + 3, { align: "center" });
+  if (logo?.dataUrl) {
+    const maxSize = 68;
+    const scale = Math.min(maxSize / logo.width, maxSize / logo.height);
+    const dw = logo.width * scale;
+    const dh = logo.height * scale;
+    doc.addImage(logo.dataUrl, "PNG", w / 2 - dw / 2, sealY - dh / 2, dw, dh);
+  } else {
+    doc.setDrawColor(12, 46, 78);
+    doc.setLineWidth(1.4);
+    doc.circle(w / 2, sealY, 30, "S");
+    doc.setDrawColor(200, 160, 40);
+    doc.setLineWidth(0.8);
+    doc.circle(w / 2, sealY, 24, "S");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(12, 46, 78);
+    doc.text("TESDA", w / 2, sealY + 3, { align: "center" });
+  }
 
   // Authority name.
   doc.setFont("helvetica", "normal");

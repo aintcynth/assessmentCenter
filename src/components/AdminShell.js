@@ -10,6 +10,7 @@ import {
   GraduationCap,
   Users,
   FolderOpen,
+  Settings,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import AppFrame from "@/components/AppFrame";
@@ -23,6 +24,7 @@ const LINKS = [
   { href: "/admin/certificates", label: "Certificate of accreditation", icon: FileBadge },
   { href: "/admin/qualification", label: "Qualification", icon: GraduationCap },
   { href: "/admin/users", label: "Users", icon: Users },
+  { href: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
 export default function AdminShell({ acName, children }) {

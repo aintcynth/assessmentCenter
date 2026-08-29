@@ -11,6 +11,7 @@ import DocumentTypeTag from "@/components/DocumentTypeTag";
 import PdfViewer from "@/components/PdfViewer";
 import { notifyUser } from "@/lib/notifications";
 import { generateCertificatePdf, generateAouPdf } from "@/lib/certificatePdf";
+import { loadImageAsPngDataUrl } from "@/lib/loadImage";
 
 // Client-only Supabase calls happen at render time, so skip static
 // prerendering (which runs at build time, before env vars may be wired up).
@@ -297,6 +298,9 @@ export default function AdminApplicationDetailPage() {
       expiry.setFullYear(expiry.getFullYear() + 2);
       const expirationDate = expiry.toISOString().slice(0, 10);
 
+      const { data: settings } = await supabase.from("app_settings").select("logo_url").eq("id", 1).maybeSingle();
+      const logo = await loadImageAsPngDataUrl(settings?.logo_url);
+
       const certBlob = generateCertificatePdf({
         acName: app.profiles?.ac_name,
         address: app.profiles?.address,
@@ -304,6 +308,7 @@ export default function AdminApplicationDetailPage() {
         certNumber: app.cert_number,
         issuanceDate,
         expirationDate,
+        logo,
       });
       const aouBlob = generateAouPdf({
         acName: app.profiles?.ac_name,

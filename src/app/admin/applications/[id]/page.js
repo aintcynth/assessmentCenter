@@ -832,20 +832,15 @@ export default function AdminApplicationDetailPage() {
                   <input
                     className="input-field bg-mist/50"
                     disabled
-                      value={
-                        issuanceDate
-                          ? (() => {
-                              const d = new Date(issuanceDate + "T00:00:00");
-                              d.setFullYear(d.getFullYear() + 2); // Adds exactly 2 years
-
-                              const month = String(d.getMonth() + 1).padStart(2, '0');
-                              const day = String(d.getDate()).padStart(2, '0');
-                              const year = d.getFullYear();
-
-                              return `${month}/${day}/${year}`; // Returns mm/dd/yyyy
-                            })()
-                          : ""
-                      }
+                    value={
+                      issuanceDate
+                        ? (() => {
+                            const d = new Date(issuanceDate + "T00:00:00");
+                            d.setFullYear(d.getFullYear() + 2);
+                            return d.toISOString().slice(0, 10);
+                          })()
+                        : ""
+                    }
                     placeholder="Pick an issuance date"
                   />
                 </div>
@@ -890,7 +885,10 @@ export default function AdminApplicationDetailPage() {
             <PdfViewer url={app.cert_pdf_url} title="Certificate of Accreditation (draft)" />
               <h2 className="font-display text-lg font-semibold text-seal">Receipt of payment / AOU</h2>
               <p className="text-sm text-ink/60">Client notified {new Date(app.notified_at).toLocaleString()}</p>
-
+              <div className="grid gap-4 sm:grid-cols-2">
+                <PdfViewer url={app.cert_pdf_url} title="Certificate of Accreditation (draft)" />
+                <PdfViewer url={app.aou_pdf_url} title="AOU (template)" />
+              </div>
               <div className="grid gap-4 sm:grid-cols-2 text-sm">
                 <div className="rounded-seal border border-seal/10 p-4">
                   <div className="mb-2 flex items-center justify-between">

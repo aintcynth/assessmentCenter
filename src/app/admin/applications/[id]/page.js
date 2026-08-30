@@ -12,18 +12,11 @@ import PdfViewer from "@/components/PdfViewer";
 import { notifyUser } from "@/lib/notifications";
 import { generateCertificatePdf, generateAouPdf } from "@/lib/certificatePdf";
 import { loadImageAsPngDataUrl } from "@/lib/loadImage";
+import { generateCertNumber } from "@/lib/certNumber";
 
 // Client-only Supabase calls happen at render time, so skip static
 // prerendering (which runs at build time, before env vars may be wired up).
 export const dynamic = "force-dynamic";
-
-function generateCertNumber(code) {
-  const year = new Date().getFullYear();
-  const random = Math.floor(Math.random() * 999999)
-    .toString()
-    .padStart(6, "0");
-  return `AC-${code || "GEN"}${year}${random}`;
-}
 
 export default function AdminApplicationDetailPage() {
   const { id } = useParams();
@@ -260,10 +253,9 @@ export default function AdminApplicationDetailPage() {
         .eq("id", latest.id);
       if (inspUpdateError) throw inspUpdateError;
 
-      const certNumber = generateCertNumber(app.qualifications?.code);
       const { error: appUpdateError } = await supabase
         .from("assessment_applications")
-        .update({ status: "certificate_processing", cert_number: certNumber })
+        .update({ status: "certificate_processing" })
         .eq("id", id);
       if (appUpdateError) throw appUpdateError;
 
@@ -272,7 +264,6 @@ export default function AdminApplicationDetailPage() {
         actorId: user.id,
         actorName: profile?.ac_name,
         action: "Marked compliant",
-        notes: `Certificate number ${certNumber} reserved`,
       });
 
       setReportFile(null);
@@ -301,11 +292,18 @@ export default function AdminApplicationDetailPage() {
       const { data: settings } = await supabase.from("app_settings").select("logo_url").eq("id", 1).maybeSingle();
       const logo = await loadImageAsPngDataUrl(settings?.logo_url);
 
+      const certNumber = await generateCertNumber(supabase, {
+        code: app.qualifications?.code,
+        level: app.qualifications?.level,
+        issuanceDate,
+        expirationDate,
+      });
+
       const certBlob = generateCertificatePdf({
         acName: app.profiles?.ac_name,
         address: app.profiles?.address,
         qualificationName: app.qualifications?.name,
-        certNumber: app.cert_number,
+        certNumber,
         issuanceDate,
         expirationDate,
         logo,
@@ -337,6 +335,7 @@ export default function AdminApplicationDetailPage() {
         .update({
           issuance_date: issuanceDate,
           expiration_date: expirationDate,
+          cert_number: certNumber,
           cert_pdf_url: certUrl,
           aou_pdf_url: aouUrl,
         })
@@ -348,7 +347,7 @@ export default function AdminApplicationDetailPage() {
         actorId: user.id,
         actorName: profile?.ac_name,
         action: "Certificate & AOU generated",
-        notes: `Issued ${issuanceDate}, expires ${expirationDate}`,
+        notes: `${certNumber} — issued ${issuanceDate}, expires ${expirationDate}`,
       });
 
       setIssuanceDate("");
@@ -510,7 +509,7 @@ export default function AdminApplicationDetailPage() {
         user_id: app.user_id,
         qualification_id: app.qualification_id,
         application_id: app.id,
-        cert_number: app.cert_number || generateCertNumber(app.qualifications?.code),
+        cert_number: app.cert_number || "AC-UNSET",
         issuance_date: app.issuance_date,
         expiration_date: app.expiration_date,
         cert_url: app.signed_cert_url,
@@ -780,7 +779,7 @@ export default function AdminApplicationDetailPage() {
             <form onSubmit={handleGenerateCertificate} className="card space-y-4">
               <h2 className="font-display text-lg font-semibold text-seal">Set issuance date</h2>
               <p className="text-sm text-ink/60">
-                Certificate number reserved: <span className="font-mono font-medium text-ink">{app.cert_number}</span>
+                The certificate number is generated automatically once you pick an issuance date.
               </p>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
@@ -821,7 +820,8 @@ export default function AdminApplicationDetailPage() {
             <div className="card space-y-4">
               <h2 className="font-display text-lg font-semibold text-seal">Review generated documents</h2>
               <p className="text-sm text-ink/60">
-                Issued {app.issuance_date} · Expires {app.expiration_date}
+                <span className="font-mono font-medium text-ink">{app.cert_number}</span> · Issued {app.issuance_date}{" "}
+                · Expires {app.expiration_date}
               </p>
               <div className="grid gap-4 sm:grid-cols-2">
                 <PdfViewer url={app.cert_pdf_url} title="Certificate of Accreditation (draft)" />

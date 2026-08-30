@@ -832,15 +832,20 @@ export default function AdminApplicationDetailPage() {
                   <input
                     className="input-field bg-mist/50"
                     disabled
-                    value={
-                      issuanceDate
-                        ? (() => {
-                            const d = new Date(issuanceDate + "T00:00:00");
-                            d.setFullYear(d.getFullYear() + 2);
-                            return d.toISOString().slice(0, 10);
-                          })()
-                        : ""
-                    }
+                      value={
+                        issuanceDate
+                          ? (() => {
+                              const d = new Date(issuanceDate + "T00:00:00");
+                              d.setFullYear(d.getFullYear() + 2); // Adds exactly 2 years
+
+                              const month = String(d.getMonth() + 1).padStart(2, '0');
+                              const day = String(d.getDate()).padStart(2, '0');
+                              const year = d.getFullYear();
+
+                              return `${month}/${day}/${year}`; // Returns mm/dd/yyyy
+                            })()
+                          : ""
+                      }
                     placeholder="Pick an issuance date"
                   />
                 </div>

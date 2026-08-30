@@ -240,9 +240,9 @@ export function generateAouPdf({ acName, address, acManager, qualificationName }
 
   // Jurat heading, right-aligned.
   doc.setFontSize(9.5);
-  doc.text("Republic of the Philippines)", w - margin, y, { align: "right" });
+  doc.text("Republic of the Philippines)", w - margin, y, { align: "left" });
   y += 13;
-  doc.text("In the City of _________)      s.s.", w - margin, y, { align: "right" });
+  doc.text("In the City of _________)      s.s.", w - margin, y, { align: "left" });
   y += 26;
 
   // Title.
@@ -315,17 +315,17 @@ export function generateAouPdf({ acName, address, acManager, qualificationName }
   ensureSpace(40);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
-  doc.text(acManager || blank, w / 2, y, { align: "center" });
+  doc.text(acManager || blank, w / 2, y, { align: "right" });
   y += 13;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9.5);
-  doc.text("Affiant", w / 2, y, { align: "center" });
+  doc.text("Affiant", w / 2, y, { align: "right" });
   y += 24;
 
   ensureSpace(40);
-  doc.text("Government Issued ID No: ________________", margin, y);
+  doc.text("Government Issued ID No: ________________", margin, y,  { align: "right" });
   y += 16;
-  doc.text("Date Issued: ___________________________", margin, y);
+  doc.text("Date Issued: ___________________________", margin, y, { align: "right" });
   y += 28;
 
   paragraph(

@@ -267,14 +267,13 @@ function ApplyWizard() {
         <div className="card space-y-4">
           <h2 className="font-display text-xl font-semibold text-seal">Documents required</h2>
           <p className="text-sm text-ink/60">
-            Upload the supporting documents for your application (e.g. application form, Appendix 11-D, Appendix
-            11-D OR). You can add as many as needed.
+            Upload the required documents for your accreditation(e.g Letter of Intent, SEC Registration, Financial Statement, Business Permit , etc.).
           </p>
 
           <form onSubmit={handleDocUpload} className="grid gap-3 rounded-seal border border-seal/10 p-4 sm:grid-cols-[1fr_1fr_auto]">
             <input
               className="input-field"
-              placeholder="Document label (e.g. Business permit)"
+              placeholder="Document label (e.g. Letter of Intent)"
               value={docLabel}
               onChange={(e) => setDocLabel(e.target.value)}
             />

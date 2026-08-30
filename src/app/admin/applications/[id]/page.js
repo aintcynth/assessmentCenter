@@ -12,7 +12,7 @@ import PdfViewer from "@/components/PdfViewer";
 import { notifyUser } from "@/lib/notifications";
 import { generateCertificatePdf, generateAouPdf } from "@/lib/certificatePdf";
 import { loadImageAsPngDataUrl } from "@/lib/loadImage";
-import { generateCertNumber } from "@/lib/certNumber";
+import { generateCertNumber, previewCertNumber } from "@/lib/certNumber";
 
 // Client-only Supabase calls happen at render time, so skip static
 // prerendering (which runs at build time, before env vars may be wired up).
@@ -39,6 +39,8 @@ export default function AdminApplicationDetailPage() {
   const [lackings, setLackings] = useState("");
 
   const [issuanceDate, setIssuanceDate] = useState("");
+  const [certPreview, setCertPreview] = useState(null);
+  const [certPreviewLoading, setCertPreviewLoading] = useState(false);
   const [signedCertFile, setSignedCertFile] = useState(null);
   const [rejectingKind, setRejectingKind] = useState(null); // "receipt" | "aou" | null
   const [rejectReason, setRejectReason] = useState("");
@@ -91,6 +93,39 @@ export default function AdminApplicationDetailPage() {
     if (id) load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // Live preview of the certificate number as the admin picks an issuance
+  // date, before actually generating anything.
+  useEffect(() => {
+    if (!issuanceDate || !app) {
+      setCertPreview(null);
+      return;
+    }
+    let cancelled = false;
+    setCertPreviewLoading(true);
+    const issued = new Date(issuanceDate + "T00:00:00");
+    const expiry = new Date(issued);
+    expiry.setFullYear(expiry.getFullYear() + 2);
+    const expirationDate = expiry.toISOString().slice(0, 10);
+
+    previewCertNumber(supabase, {
+      code: app.qualifications?.code,
+      level: app.qualifications?.level,
+      issuanceDate,
+      expirationDate,
+    })
+      .then((result) => {
+        if (!cancelled) setCertPreview(result);
+      })
+      .finally(() => {
+        if (!cancelled) setCertPreviewLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [issuanceDate, app]);
 
   async function currentAdmin() {
     const {
@@ -810,6 +845,18 @@ export default function AdminApplicationDetailPage() {
                   />
                 </div>
               </div>
+              {issuanceDate && (
+                <p className="text-sm text-ink/60">
+                  {certPreviewLoading ? (
+                    "Calculating certificate number…"
+                  ) : certPreview ? (
+                    <>
+                      This will be the <span className="font-medium text-ink">{certPreview.label}</span> —{" "}
+                      <span className="font-mono font-medium text-ink">{certPreview.certNumber}</span>
+                    </>
+                  ) : null}
+                </p>
+              )}
               <button type="submit" disabled={busy || !issuanceDate} className="btn-primary">
                 Generate certificate &amp; AOU
               </button>

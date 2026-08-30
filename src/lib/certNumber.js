@@ -37,3 +37,23 @@ export async function generateCertNumber(supabase, { code, level, issuanceDate, 
   const seq = await nextSequenceForYear(supabase, issued.getFullYear());
   return `AC-${(code || "GEN").toUpperCase()}${levelToCode(level)}0215${yyIssue}${yyExpiry}${String(seq).padStart(3, "0")}`;
 }
+
+function ordinal(n) {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+// Preview-only variant: returns the number plus a human label ("1st
+// certificate issued in 2026") without writing anything, so the admin can
+// see what number will be assigned before committing to it.
+export async function previewCertNumber(supabase, { code, level, issuanceDate, expirationDate }) {
+  const issued = new Date(issuanceDate + "T00:00:00");
+  const expiry = new Date(expirationDate + "T00:00:00");
+  const seq = await nextSequenceForYear(supabase, issued.getFullYear());
+  const yyIssue = String(issued.getFullYear()).slice(-2);
+  const yyExpiry = String(expiry.getFullYear()).slice(-2);
+  const certNumber = `AC-${(code || "GEN").toUpperCase()}${levelToCode(level)}0215${yyIssue}${yyExpiry}${String(seq).padStart(3, "0")}`;
+  const label = `${ordinal(seq - 100)} certificate issued in ${issued.getFullYear()}`;
+  return { certNumber, label };
+}

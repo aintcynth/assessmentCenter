@@ -36,7 +36,7 @@ export default async function AdminCertificatesPage() {
               {centers.map((c) => (
                 <tr key={c.id}>
                   <td className="py-3 pr-4 font-mono text-xs text-ink/70">{c.cert_number}</td>
-                  <td className="py-3 pr-4 font-medium text-ink">{c.profiles?.ac_name}</td>
+                  <td className="py-3 pr-4 font-medium text-ink">{c.profiles?.ac_name || c.center_name}</td>
                   <td className="py-3 pr-4 text-ink/70">{c.qualifications?.name}</td>
                   <td className="py-3 pr-4 text-ink/70">{c.issuance_date}</td>
                   <td className="py-3 text-ink/70">{c.expiration_date || "—"}</td>

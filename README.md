@@ -24,6 +24,35 @@ existing phpMyAdmin/MariaDB dump — see [`supabase/schema.sql`](./supabase/sche
 | —                                     | `payment_submissions` (new)           |
 | —                                     | `application_activity_log` (new — the "trailsheet") |
 
+## Importing legacy accredited centers
+
+`supabase/006_import_legacy_centers.sql` was generated from a real monitoring
+spreadsheet (`AC_MONITORING_2026.xlsx`, `2025`/`2026` tabs) and does three
+things:
+
+1. Adds `center_name`, `address`, and `sector` columns to
+   `assessment_centers` so a historical record can stand on its own without
+   a linked portal account (`user_id` stays null for these).
+2. Fixes 16 qualifications whose `level` column didn't match their own name
+   (e.g. a row literally named `BOOKKEEPING NC III` had `level = 'II'`) —
+   this was a bug inherited from the original source dump, not something
+   the spreadsheet introduced, and it affects the live qualification picker
+   everywhere in the app, not just this import.
+3. Imports 198 accredited-center records (103 from 2025, 95 from 2026),
+   matched against the qualifications catalog by code + corrected level,
+   adding the one qualification genuinely missing from the catalog
+   (Barangay Health Services NC II). The 2026 batch includes a Google Drive
+   link to each signed certificate, carried over into `cert_url`.
+
+Every read path that displays a center's name (Admin → Centers/Accredited/Certificate
+of accreditation) falls back to `center_name`/`address` when there's no
+linked `profiles` row, so these show up correctly alongside centers created
+through the normal application flow. They won't appear on any client
+dashboard, though — there's no account to attach them to.
+
+The insert is idempotent on `cert_number` (safe to re-run if the source
+spreadsheet changes and you want to reimport).
+
 ## The full workflow (from the hand-drawn client/admin process flows)
 
 1. **Apply** — client picks a qualification, uploads supporting documents,
@@ -104,6 +133,8 @@ Notes on the migration:
      followed by [`supabase/003_certificate_pipeline.sql`](./supabase/003_certificate_pipeline.sql)
      and [`supabase/004_ac_profile_fields.sql`](./supabase/004_ac_profile_fields.sql)
      and [`supabase/005_app_settings.sql`](./supabase/005_app_settings.sql),
+     then optionally [`supabase/006_import_legacy_centers.sql`](./supabase/006_import_legacy_centers.sql)
+     if you want the historical 2025/2026 accredited-center records imported (see below),
      which additively add everything from the inspection cycle through
      certificate issuance without touching your existing data.
 3. In **Project Settings → API**, copy the **Project URL** and **anon public

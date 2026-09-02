@@ -30,7 +30,7 @@ export default async function AdminAccreditedPage() {
                 <div>
                   <p className="font-medium text-ink">{c.qualifications?.name}</p>
                   <p className="text-xs text-ink/50">
-                    {c.profiles?.ac_name} · {c.cert_number}
+                    {c.profiles?.ac_name || c.center_name} · {c.cert_number}
                   </p>
                 </div>
                 <StatusPill status={c.status} />

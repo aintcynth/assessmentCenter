@@ -1,0 +1,255 @@
+-- ============================================================================
+-- Migration: import legacy accredited centers (2025 + 2026 monitoring data)
+--
+-- Adds standalone name/address/sector fields to assessment_centers so
+-- historical records can exist without a linked portal account, fixes 16
+-- qualifications whose 'level' column didn't match their own name (e.g.
+-- 'BOOKKEEPING NC III' was stored with level='II'), adds the one genuinely
+-- missing qualification (Barangay Health Services NC II), then imports 198
+-- accredited-center records from AC_MONITORING_2026.xlsx (103 from 2025, 95
+-- from 2026).
+--
+-- Run this once in the Supabase SQL editor. Safe to re-run: center rows are
+-- upserted on cert_number, qualification level fixes are idempotent.
+-- ============================================================================
+
+-- 1. Standalone fields for centers without a linked portal account.
+alter table public.assessment_centers
+  add column if not exists center_name text,
+  add column if not exists address text,
+  add column if not exists sector text;
+
+-- 2. Fix qualifications whose stored level didn't match their own name
+--    (inherited from the original source dump).
+update public.qualifications set level = 'III' where id = 18;
+update public.qualifications set level = 'III' where id = 20;
+update public.qualifications set level = 'III' where id = 22;
+update public.qualifications set level = 'III' where id = 33;
+update public.qualifications set level = 'III' where id = 37;
+update public.qualifications set level = 'III' where id = 42;
+update public.qualifications set level = 'III' where id = 44;
+update public.qualifications set level = 'III' where id = 47;
+update public.qualifications set level = 'III' where id = 49;
+update public.qualifications set level = 'III' where id = 51;
+update public.qualifications set level = 'III' where id = 64;
+update public.qualifications set level = 'III' where id = 72;
+update public.qualifications set level = 'III' where id = 76;
+update public.qualifications set level = 'III' where id = 86;
+update public.qualifications set level = 'III' where id = 90;
+update public.qualifications set level = 'III' where id = 97;
+
+-- 3. The one qualification genuinely missing from the catalog.
+insert into public.qualifications (id, name, description, level, code) values (99, 'BARANGAY HEALTH SERVICES NC II', 'Human Health / Health Care', 'II', 'BHS') on conflict (id) do nothing;
+
+-- 4. Import the 198 accredited-center records. No user_id/application_id —
+--    these predate the portal, so center_name/address stand in for the
+--    profiles join used elsewhere in the app.
+insert into public.assessment_centers
+  (center_name, address, sector, qualification_id, cert_number, issuance_date, expiration_date, cert_url, status)
+values
+  ('CAGAYAN STATE UNIVERSITY APARRI', 'Maura, Aparri, Cagayan', 'Social, Community Development and Other Services', 33, 'AC-BKP0302152628101', '2026-01-05', '2028-01-05', 'https://drive.google.com/file/d/1Zdn2Znf48KAtd5eTW1ga0r189smox70q/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY APARRI', 'Maura, Aparri, Cagayan', 'Agriculture Forestry and Fishery', 64, 'AC-HSK0302152628102', '2026-01-05', '2028-01-05', 'https://drive.google.com/file/d/1u1ToAToimZTH0FZ_XhxdwyvGtWhikyHm/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY APARRI', 'Maura, Aparri, Cagayan', 'Tourism (Hotel and Restaurant)', 51, 'AC-FBS0302152628103', '2026-01-05', '2028-01-05', 'https://drive.google.com/file/d/1hlv99uxPZdf_rr6f6xx4WKQi4TSwpAZs/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY APARRI', 'Maura, Aparri, Cagayan', 'Tourism (Hotel and Restaurant)', 50, 'AC-FBS0202152628104', '2026-01-05', '2028-01-05', 'https://drive.google.com/file/d/1lDBcuM37YEwuA037GV123JAGjXGd2hIE/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY APARRI', 'Maura, Aparri, Cagayan', 'Tourism (Hotel and Restaurant)', 63, 'AC-HSK0202152628105', '2026-01-05', '2028-01-05', 'https://drive.google.com/file/d/1cQOmLib56ZZrmnaDjc-jJ-4oqZRnJjTJ/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY APARRI', 'Maura, Aparri, Cagayan', 'Agriculture Forestry and Fishery', 26, 'AC-ATC0202152628106', '2026-01-05', '2028-01-05', 'https://drive.google.com/file/d/1R9nRDdL1AA8xyMBez6dpuEFuO6Jvze6m/view?usp=drivesdk', 'active'),
+  ('MILEAGE DEVELOPMENT AND TRAINING CENTER, INC.', 'Pallua Norte, Tuguegarao City, Cagayan', 'Construction', 55, 'AC-FOR0202152628107', '2026-01-05', '2028-01-05', 'https://drive.google.com/file/d/1Bm4IUsJp01wY8ScHNMBBeiOlnCGfrrar/view?usp=drivesdk', 'active'),
+  ('MILEAGE DEVELOPMENT AND TRAINING CENTER, INC.', 'Pallua Norte, Tuguegarao City, Cagayan', 'Construction', 57, 'AC-MGO0202152628108', '2026-01-05', '2028-01-05', 'https://drive.google.com/file/d/1oSkIOh3olfTbFTM05RDoIGlD2h86ndgv/view?usp=drivesdk', 'active'),
+  ('TLC POLYTECHNIC INSTITUTE, INC.', 'Logac, Lallo, Cagayan', 'Garments', 41, 'AC-DRM0202152628109', '2026-01-05', '2028-01-05', 'https://drive.google.com/file/d/1HNtYMXOJKT2DO9GzKc-u5CXDiwp-qacA/view?usp=drivesdk', 'active'),
+  ('TLC POLYTECHNIC INSTITUTE, INC.', 'Logac, Lallo, Cagayan', 'Agriculture Forestry and Fishery', 19, 'AC-AGE0202152628110', '2026-01-05', '2028-01-05', 'https://drive.google.com/file/d/19STYDmYEORliJNX7xr32slpyHWoz1HXL/view?usp=drivesdk', 'active'),
+  ('CORDOVA NATIONAL AGRI-TOURISM SCHOOL', 'Cordova, Amulung, Cagayan', 'Agriculture Forestry and Fishery', 17, 'AC-ACP0202152628111', '2026-01-15', '2028-01-15', 'https://drive.google.com/file/d/173dYXopaI9Wi_NrTv0NbMwsF5rzwiGaS/view?usp=drivesdk', 'active'),
+  ('CAGAYAN PROFICIENCY TRAINING CENTER INC.', '142 Maharlika Highway, Leonarda, Tuguegarao City, Cagayan', 'tourism (Hotel and Restaurant)', 39, 'AC-COK0202152628112', '2026-01-22', '2028-01-22', 'https://drive.google.com/file/d/1qxP2bIf4INWOgMcqAx5ljwWwiP3_N9k-/view?usp=drivesdk', 'active'),
+  ('ABULUG SCHOOL OF FISHERIES', 'Centro, Abulug, Cagayan', 'Agriculture Forestry and Fishery', 26, 'AC-ATC0202152628113', '2026-02-02', '2028-02-02', 'https://drive.google.com/file/d/1jQaiXuFygVyiLtNngFl3uAEH6WOlBAbq/view?usp=drivesdk', 'active'),
+  ('PEÑABLANCA NATIONAL HIGH SCHOOL', 'Camasi, Peñablanca, Cagayan', 'Tourism (Hotel and Restaurant)', 34, 'AC-BPP0202152628114', '2026-02-12', '2028-02-12', 'https://drive.google.com/file/d/1OmiNcetfp6Hf348IqzKqYblF3vzzOpBu/view?usp=drivesdk', 'active'),
+  ('ENRILE VOCATIONAL HIGH SCHOOL', 'Barangay 02, Enrile, Cagayan', 'Automotive and Land Transportation', 28, 'AC-ATS0102152628115', '2026-02-12', '2028-02-12', 'https://drive.google.com/file/d/1VHx5CVXZYcBB27GsGZNe187CegisMdJS/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY PIAT', 'Baung, Piat, Cagayan', 'Agriculture Forestry and Fishery', 22, 'AC-AHC0302152628116', '2026-02-16', '2028-02-16', 'https://drive.google.com/file/d/1WjtaS54oEdfFL6ptdGmhy-v_dWqZzg-S/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY PIAT', 'Baung, Piat, Cagayan', 'Agriculture Forestry and Fishery', 17, 'AC-ACP0202152628117', '2026-02-16', '2028-02-16', 'https://drive.google.com/file/d/1yQxHhMitDr4UU5wvfEUChOtEBg_IMgcs/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY PIAT', 'Baung, Piat, Cagayan', 'Agriculture Forestry and Fishery', 70, 'AC-OAP0202152628118', '2026-02-16', '2028-02-16', 'https://drive.google.com/file/d/1I3Li4jDEl3hsnhLWTjJUdvf21x4L9z8K/view?usp=drivesdk', 'active'),
+  ('TUAO VOCATIONAL AND TECHNICAL SCHOOL', 'Naruangan, Tuao, Cagayan', 'Tourism (Hotel and Restaurant)', 34, 'AC-BPP0202152628119', '2026-02-20', '2028-02-20', 'https://drive.google.com/file/d/1XYNM19Zl7yDrgpnKaAikeNuiPl0RUCM8/view?usp=drivesdk', 'active'),
+  ('TUGUEGARAO TRAINING AND ASSESSMENT CENTER INC.', '#50 Quirino Street, San Gabriel, Tuguegarao City', 'Automotive and Land Transportation', 28, 'AC-ATS0102152628120', '2026-02-20', '2028-02-20', 'https://drive.google.com/file/d/1Ep7yQ54vIJA3tQJctISwKcdD_ZcW-ro9/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY GONZAGA', 'Flourishing, Gonzaga, Cagayan', 'Agriculture Forestry and Fishery', 20, 'AC-AGE0302152628121', '2026-03-02', '2028-03-02', 'https://drive.google.com/file/d/1txTwu-JB5VRaqSyVnJjujvYO_FyXLOZI/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY GONZAGA', 'Flourishing, Gonzaga, Cagayan', 'Agriculture Forestry and Fishery', 21, 'AC-AGE0402152628122', '2026-03-02', '2028-03-02', 'https://drive.google.com/file/d/1ASJpSmq3QeSpwkBqbs1xJVBMi0EzGvEH/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY GONZAGA', 'Flourishing, Gonzaga, Cagayan', 'Agriculture Forestry and Fishery', 19, 'AC-AGE0202152628123', '2026-03-02', '2028-03-02', 'https://drive.google.com/file/d/1p3sjPZwHpYRLkEXYld1nUAYg9qvDOub2/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY GONZAGA', 'Flourishing, Gonzaga, Cagayan', 'Agriculture Forestry and Fishery', 16, 'AC-ACP0102152628124', '2026-03-02', '2028-03-02', 'https://drive.google.com/file/d/13kmhNADLPtDKt3mutYrywVZhSupxnp8I/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY GONZAGA', 'Flourishing, Gonzaga, Cagayan', 'Agriculture Forestry and Fishery', 17, 'AC-ACP0202152628125', '2026-03-02', '2028-03-02', 'https://drive.google.com/file/d/19_MI_14jitV3F-_c2A5q3b9Rq9u5Yx7r/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY GONZAGA', 'Flourishing, Gonzaga, Cagayan', 'Agriculture Forestry and Fishery', 18, 'AC-ACP0302152628126', '2026-03-02', '2028-03-02', 'https://drive.google.com/file/d/1YMk_V-qJIWUviZbV2qDnEz0QmQaj2srV/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY GONZAGA', 'Flourishing, Gonzaga, Cagayan', 'Tourism (Hotel and Restaurant)', 64, 'AC-HSK0302152628127', '2026-03-02', '2028-03-02', 'https://drive.google.com/file/d/1ytPflJqbW9GehlNkcv3TIcWg5wU7EwGu/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY GONZAGA', 'Flourishing, Gonzaga, Cagayan', 'Automotive and Land Transportation', 43, 'AC-DRV0202152628128', '2026-03-02', '2028-03-02', 'https://drive.google.com/file/d/17I-gAAfqvLYnL8RoCNviLHfNOToLINDu/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY GONZAGA', 'Flourishing, Gonzaga, Cagayan', 'Agriculture Forestry and Fishery', 23, 'AC-APP0202152628129', '2026-03-02', '2028-03-02', 'https://drive.google.com/file/d/1KmGGrGs4Gq2-PXohm_TJAIXQLt2vvqnc/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY GONZAGA', 'Flourishing, Gonzaga, Cagayan', 'Agriculture Forestry and Fishery', 54, 'AC-GRP0202152628130', '2026-03-02', '2028-03-02', 'https://drive.google.com/file/d/11xhc6c3DHqXDHwRGP3m4PZEMyWLKaFEF/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY GONZAGA', 'Flourishing, Gonzaga, Cagayan', 'Social, Community Development and Other Services', 33, 'AC-BKP0302152628131', '2026-03-02', '2028-03-02', 'https://drive.google.com/file/d/17PvbrVz7SaB7ELO-xttuY5EkRUnqQ0NM/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY GONZAGA', 'Flourishing, Gonzaga, Cagayan', 'Agriculture Forestry and Fishery', 71, 'AC-PMV0202152628132', '2026-03-02', '2028-03-02', 'https://drive.google.com/file/d/1B8fLKR_MpoCQukBKTukBOctQMf2yuUrI/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY GONZAGA', 'Flourishing, Gonzaga, Cagayan', 'Agriculture Forestry and Fishery', 25, 'AC-APS0202152628133', '2026-03-02', '2028-03-02', 'https://drive.google.com/file/d/1JtCWYSUQwOmtnr2q2vYeGWxnpEiGYTlt/view?usp=drivesdk', 'active'),
+  ('R.L. GARIO TRAINING CENTER, INC.', 'Agusi, Camalaniugan, Cagayan', 'Construction', 55, 'AC-FOR0202152628134', '2026-03-10', '2028-03-10', 'https://drive.google.com/file/d/1Ep_zzUhK2oqm5T7Hx5tZ5lQj0zmW9tsM/view?usp=drivesdk', 'active'),
+  ('R.L. GARIO TRAINING CENTER, INC.', 'Agusi, Camalaniugan, Cagayan', 'Construction', 61, 'AC-WLO0202152628135', '2026-03-10', '2028-03-10', 'https://drive.google.com/file/d/1gJzyrHPXHce3Lc5c7NQEss_3bpW6R_qB/view?usp=drivesdk', 'active'),
+  ('R.L. GARIO TRAINING CENTER, INC.', 'Agusi, Camalaniugan, Cagayan', 'Construction', 56, 'AC-HEO0202152628136', '2026-03-10', '2028-03-10', 'https://drive.google.com/file/d/1x1njA6kY0zrRnTm31xJUEj1xtFVHO3fB/view?usp=drivesdk', 'active'),
+  ('TLC POLYTECHNIC INSTITUTE, INC.', 'Logac, Lallo, Cagayan', 'Tourism (Hotel and Restaurant)', 34, 'AC-BPP0202152628137', '2026-03-11', '2028-03-11', 'https://drive.google.com/file/d/1bFCAjZFQ6mrXYgnZqc85RZadT9S47iHp/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY CARIG', 'Carig Sur, Tuguegarao City, Cagayan', 'Electrical & Electronics', 48, 'AC-EPA0202152628138', '2026-03-16', '2028-03-16', 'https://drive.google.com/file/d/1-xlDF59kN8g5f536agQy5vp4pqmTGGIT/view?usp=drivesdk', 'active'),
+  ('PROVINCIAL TRAINING CENTER - CAGAYAN', 'Centro Sur, Gattaran, Cagayan', 'Construction', 36, 'AC-CAR0202152628139', '2026-03-31', '2028-03-31', 'https://drive.google.com/file/d/1Meptm3Rc64rwpAwq-RymOzxvj4TtTMTM/view?usp=drivesdk', 'active'),
+  ('MALLARI TRAINING AND ASSESSMENT CENTER INC.', 'Pallua Norte, Tuguegarao City, Cagayan', 'Automotive and Land Transportation', 43, 'AC-DRV0202152628140', '2026-04-13', '2028-04-13', 'https://drive.google.com/file/d/1cnnzdGeSbmwqGSbM8oW5M3ygElQpW2SN/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY SANCHEZ MIRA', 'Centro 2, Sanchez Mira, Cagayan', 'Agriculture Forestry and Fishery', 17, 'AC-ACP0202152628141', '2026-04-20', '2028-04-20', 'https://drive.google.com/file/d/1lVN9L58mFFKU1V6igb_NlcxDLldL5PpM/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY SANCHEZ MIRA', 'Centro 2, Sanchez Mira, Cagayan', 'Agriculture Forestry and Fishery', 18, 'AC-ACP0302152628142', '2026-04-20', '2028-04-20', 'https://drive.google.com/file/d/1Ggi6kvbkL4h350CmidOAXhSF2tpzDNTi/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY SANCHEZ MIRA', 'Centro 2, Sanchez Mira, Cagayan', 'Agriculture Forestry and Fishery', 19, 'AC-AGE0202152628143', '2026-04-20', '2028-04-20', 'https://drive.google.com/file/d/1XXeOXUXQkXygtDWAjFJ8bBcjzLoRpOSs/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY SANCHEZ MIRA', 'Centro 2, Sanchez Mira, Cagayan', 'Agriculture Forestry and Fishery', 20, 'AC-AGE0302152628144', '2026-04-20', '2028-04-20', 'https://drive.google.com/file/d/1irAbt5lJkNtXWH1IXzanXik6upF38uKw/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY SANCHEZ MIRA', 'Centro 2, Sanchez Mira, Cagayan', 'Agriculture Forestry and Fishery', 21, 'AC-AGE0402152628145', '2026-04-20', '2028-04-20', 'https://drive.google.com/file/d/1KLoGIiuT4vNLd2uRQKkElyn6-AE3IGUo/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY SANCHEZ MIRA', 'Centro 2, Sanchez Mira, Cagayan', 'Agriculture Forestry and Fishery', 23, 'AC-APP0202152628146', '2026-04-20', '2028-04-20', 'https://drive.google.com/file/d/1gv0eIGLxHjTovI9oFulDLguD5uL23sVu/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY SANCHEZ MIRA', 'Centro 2, Sanchez Mira, Cagayan', 'Social, Community Development and Other Services', 33, 'AC-BKP0302152628147', '2026-04-20', '2028-04-20', 'https://drive.google.com/file/d/1Y5EVVZF0Z1dYMwPX5fW73OihMn1amsPb/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY SANCHEZ MIRA', 'Centro 2, Sanchez Mira, Cagayan', 'Tourism (Hotel and Restaurant)', 50, 'AC-FBS0202152628148', '2026-04-20', '2028-04-20', 'https://drive.google.com/file/d/1jMeFNxlg5C35jYnE0C_rTjlYGeWUuXmh/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY SANCHEZ MIRA', 'Centro 2, Sanchez Mira, Cagayan', 'Tourism (Hotel and Restaurant)', 63, 'AC-HSK0202152628149', '2026-04-20', '2028-04-20', 'https://drive.google.com/file/d/1eIzoz5waB4TtIPjvdxsrthG078AvaYE6/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY SANCHEZ MIRA', 'Centro 2, Sanchez Mira, Cagayan', 'Agriculture Forestry and Fishery', 70, 'AC-OAP0202152628150', '2026-04-20', '2028-04-20', 'https://drive.google.com/file/d/1-mzOl3KgTw7y3T8R-gnspC2A8foYf94U/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY SANCHEZ MIRA', 'Centro 2, Sanchez Mira, Cagayan', 'Agriculture Forestry and Fishery', 71, 'AC-PMV0202152628151', '2026-04-20', '2028-04-20', 'https://drive.google.com/file/d/1SyM0Lh6vHdGCT47qEMzW3QrbZudX5a6e/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY SANCHEZ MIRA', 'Centro 2, Sanchez Mira, Cagayan', 'Tourism (Hotel and Restaurant)', 84, 'AC-TPS0202152628152', '2026-04-20', '2028-04-20', 'https://drive.google.com/file/d/10a_LJLFMcPyt2iPQzhbHZhRPxcacqSGp/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY SANCHEZ MIRA', 'Centro 2, Sanchez Mira, Cagayan', 'Automotive and Land Transportation', 43, 'AC-DRV0202152628153', '2026-04-20', '2028-04-20', 'https://drive.google.com/file/d/1k9LzZpvNCtTpzVsj7jZgFKSV_PPQG_3v/view?usp=drivesdk', 'active'),
+  ('DOÑA AMPARO TRAINING AND ASSESSMENT CENTER INC.', 'Daan-ili, Allacapan, Cagayan', 'Agriculture Forestry and Fishery', 19, 'AC-AGE0202152628154', '2026-04-27', '2028-04-27', 'https://drive.google.com/file/d/1qMeWJA9nU3rT98GQBjIppkzMFGgHE_gO/view?usp=drivesdk', 'active'),
+  ('OUR LADY OF FATIMA INTEGRATED SCHOOL OF DUGO, INC.', 'Dugo, Camalaniugan, Cagayan', 'Agriculture Forestry and Fishery', 70, 'AC-OAP0202152628155', '2026-05-06', '2028-05-06', 'https://drive.google.com/file/d/1icbVpw69AUxlS2texqQexxroAtUdM4NZ/view?usp=drivesdk', 'active'),
+  ('OUR LADY OF FATIMA INTEGRATED SCHOOL OF DUGO, INC.', 'Dugo, Camalaniugan, Cagayan', 'Agriculture Forestry and Fishery', 17, 'AC-ACP0202152628156', '2026-05-06', '2028-05-06', 'https://drive.google.com/file/d/1GK7sBhofIG7mJuH46JeWszTmL3tU7xFi/view?usp=drivesdk', 'active'),
+  ('REGIONAL TRAINING CENTER', 'Carig Norte, Tuguegarao City, Cagayan', 'Construction', 75, 'AC-PVI0202152628157', '2026-05-13', '2028-05-13', 'https://drive.google.com/file/d/14pB2PJiQvPHg3tMz39DoFic69KjrLr_H/view?usp=drivesdk', 'active'),
+  ('REGIONAL TRAINING CENTER', 'Carig Norte, Tuguegarao City, Cagayan', 'Construction', 76, 'AC-PVS0302152628158', '2026-05-13', '2028-05-13', 'https://drive.google.com/file/d/1-bA13SWEBlBAPJrvadDscQccewNUPxjm/view?usp=drivesdk', 'active'),
+  ('REGIONAL TRAINING CENTER', 'Carig Norte, Tuguegarao City, Cagayan', 'Social, Community Development and Other Services', 40, 'AC-DOW0202152628159', '2026-05-13', '2028-05-13', 'https://drive.google.com/file/d/1kB612DmW3RTDoyEYL2ZzoOJDQhzChk9h/view?usp=drivesdk', 'active'),
+  ('REGIONAL TRAINING CENTER', 'Carig Norte, Tuguegarao City, Cagayan', 'Agriculture Forestry and Fishery', 70, 'AC-OAP0202152628160', '2026-05-13', '2028-05-13', 'https://drive.google.com/file/d/1T6DcMTBNdFdc0phv26JcrnYekWAO5m5J/view?usp=drivesdk', 'active'),
+  ('REGIONAL TRAINING CENTER', 'Carig Norte, Tuguegarao City, Cagayan', 'Automotive and Land Transportation', 29, 'AC-ATS0402152628161', '2026-05-13', '2028-05-13', 'https://drive.google.com/file/d/1ZmzCtLq0O4wXjKmjegX4fMF9woq5ZPda/view?usp=drivesdk', 'active'),
+  ('ABULUG NATIONAL RURAL AND VOCATIONAL HIGH SCHOOL', 'Langay - Banguian, Abulug, Cagayan', 'Agriculture Forestry and Fishery', 17, 'AC-ACP0202152628162', '2026-05-18', '2028-05-18', 'https://drive.google.com/file/d/1SdLV5SKxeOOAHH6jUAmG5VywL9bInBa0/view?usp=drivesdk', 'active'),
+  ('ABULUG NATIONAL RURAL AND VOCATIONAL HIGH SCHOOL', 'Langay - Banguian, Abulug, Cagayan', 'Electrical & Electronics', 38, 'AC-CSS0202152628163', '2026-05-18', '2028-05-18', 'https://drive.google.com/file/d/10m8HtMsv0bG1lO96xpN_vBIaKm0kM-JX/view?usp=drivesdk', 'active'),
+  ('CAGAYAN 1 ELECTRIC COOPERATIVE, INC.', 'Maddarulug, Solana, Cagayan', 'Utilities', 45, 'AC-EPD0202152628164', '2026-05-25', '2028-05-25', 'https://drive.google.com/file/d/1rsXH7a3o6Z7DOiU_Q-o5-b5NZhou6Shg/view?usp=drivesdk', 'active'),
+  ('TUGUEGARAO TRAINING AND ASSESSMENT CENTER INC.', '#50 Quirino Street, San Gabriel, Tuguegarao City', 'Tourism (Hotel and Restaurant)', 63, 'AC-HSK0202152628165', '2026-06-04', '2028-06-04', 'https://drive.google.com/file/d/1o4dKuuwE525fDawUem0YV0rNVpGuisKf/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY APARRI', 'Maura, Aparri, Cagayan', 'Tourism (Hotel and Restaurant)', 84, 'AC-TPS0202152628166', '2026-06-08', '2028-06-08', 'https://drive.google.com/file/d/14b12BXeRwpt5ItnunhRT_XyDej0YzMJA/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY APARRI', 'Maura, Aparri, Cagayan', 'ICT', 86, 'AC-WBD0302152628167', '2026-06-08', '2028-06-08', 'https://drive.google.com/file/d/1vLVDOXknDBlhx73lTaoVX-f7kycBpmvO/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY APARRI', 'Maura, Aparri, Cagayan', 'Tourism (Hotel and Restaurant)', 49, 'AC-EVM0302152628168', '2026-06-08', '2028-06-08', 'https://drive.google.com/file/d/1vGZfqHe36baIU_aV0vXPHVAcRhw4ONP0/view?usp=drivesdk', 'active'),
+  ('PROVINCIAL TRAINING CENTER - CAGAYAN', 'Centro Sur, Gattaran, Cagayan', 'Agriculture Forestry and Fishery', 70, 'AC-OAP0202152628169', '2026-06-11', '2028-06-11', 'https://drive.google.com/file/d/1onyGRavq87a39ZW-hfFEGUnUZyk3cRlV/view?usp=drivesdk', 'active'),
+  ('APARRI POLYTECHNIC INSTITUTE', 'Rizal Street, Maura, Aparri, Cagayan', 'Construction', 66, 'AC-MAS0202152628170', '2026-06-11', '2028-06-11', 'https://drive.google.com/file/d/1Cjy3YMSumDjJ42jflIMcSugh91XgaMb4/view?usp=drivesdk', 'active'),
+  ('APARRI POLYTECHNIC INSTITUTE', 'Rizal Street, Maura, Aparri, Cagayan', 'Construction', 36, 'AC-CAR0202152628171', '2026-06-11', '2028-06-11', 'https://drive.google.com/file/d/1gbv-NMX78WXJpsOuF-ZXngBrx6tBxv-K/view?usp=drivesdk', 'active'),
+  ('APARRI POLYTECHNIC INSTITUTE', 'Rizal Street, Maura, Aparri, Cagayan', 'Construction', 75, 'AC-PVI0202152628172', '2026-06-11', '2028-06-11', 'https://drive.google.com/file/d/1xb-rgRCJMwz7TceLaPqJVDGtTh81tU82/view?usp=drivesdk', 'active'),
+  ('APARRI POLYTECHNIC INSTITUTE', 'Rizal Street, Maura, Aparri, Cagayan', 'Construction', 73, 'AC-PLM0202152628173', '2026-06-11', '2028-06-11', 'https://drive.google.com/file/d/1OqFj-QE9P1fYuLjdPy23ptPCN64jbYmh/view?usp=drivesdk', 'active'),
+  ('DBJ SKILLS TRAINING CENTER, INC.', 'Buntun, Tuguegarao City, Cagayan', 'Construction', 56, 'AC-HEO0202152628174', '2026-06-15', '2028-06-15', 'https://drive.google.com/file/d/1aYcy4_QHbH5Q6SQNm_fPWifurrPmMXYr/view?usp=drivesdk', 'active'),
+  ('BAGGAO NATIONAL SCHOOL OF ARTS AND TRADES', 'Dabbac Grande, Baggao, Cagayan', 'Electrical & Electronics', 38, 'AC-CSS0202152628175', '2026-06-15', '2028-06-15', 'https://drive.google.com/file/d/12yXEO2lQ5i3OwKLGHYHNTlgZbyhmDnlO/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY CARIG', 'Carig Sur, Tuguegarao City, Cagayan', 'Tourism (Hotel and Restaurant)', 34, 'AC-BPP0202152628176', '2026-06-18', '2028-06-18', 'https://drive.google.com/file/d/1RA5WpjZiyS0LkLzgfDYEOyHtOu1LRkQA/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY CARIG', 'Carig Sur, Tuguegarao City, Cagayan', 'Garments', 41, 'AC-DRM0202152628177', '2026-06-18', '2028-06-18', 'https://drive.google.com/file/d/1fiX5157QTEF_C5oxcAs9_CFP6wawhb2g/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY CARIG', 'Carig Sur, Tuguegarao City, Cagayan', 'Automotive and Land Transportation', 43, 'AC-DRV0202152628178', '2026-06-18', '2028-06-18', 'https://drive.google.com/file/d/1WchtHUUqkKa4tcWvrkAie-KfzFnUwOAU/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY LASAM', 'Centro 2, Lasam, Cagayan', 'ICT', 86, 'AC-WBD0302152628179', '2026-06-25', '2028-06-25', 'https://drive.google.com/file/d/1y11A09k8iGA7mUi_tFm5dS4-I5aIjA_H/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY LASAM', 'Centro 2, Lasam, Cagayan', 'Electrical & Electronics', 38, 'AC-CSS0202152628180', '2026-06-25', '2028-06-25', 'https://drive.google.com/file/d/1ZH0bHVIqJQgDV7QaOv8gNZO2x4ZDYOD9/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY LASAM', 'Centro 2, Lasam, Cagayan', 'Construction', 75, 'AC-PVI0202152628181', '2026-06-25', '2028-06-25', 'https://drive.google.com/file/d/1qZhsaUvkPklBVCL1cbatxwshJMmxgR_2/view?usp=drivesdk', 'active'),
+  ('CAGAYAN PROFICIENCY TRAINING CENTER INC.', '142 Maharlika Highway, Leonarda, Tuguegarao City, Cagayan', 'Tourism (Hotel and Restaurant)', 53, 'AC-FOS0202152628182', '2026-07-01', '2028-07-01', 'https://drive.google.com/file/d/14OoA6QScZliYaIPubW3DFuChbWBqDy_h/view?usp=drivesdk', 'active'),
+  ('APARRI POLYTECHNIC INSTITUTE', 'Rizal Street, Maura, Aparri, Cagayan', 'Social, Community Development and Other Services', 33, 'AC-BKP0302152628183', '2026-07-01', '2028-07-01', 'https://drive.google.com/file/d/1pJN_U3U8xJU8VfM0NI7yfz0JVdofxjue/view?usp=drivesdk', 'active'),
+  ('APARRI POLYTECHNIC INSTITUTE', 'Rizal Street, Maura, Aparri, Cagayan', 'Tourism (Hotel and Restaurant)', 64, 'AC-HSK0302152628184', '2026-07-01', '2028-07-01', 'https://drive.google.com/file/d/1bmIFlxObxTs8by_ZInKYaXjDZ8262Le3/view?usp=drivesdk', 'active'),
+  ('APARRI POLYTECHNIC INSTITUTE', 'Rizal Street, Maura, Aparri, Cagayan', 'Electrical & Electronics', 47, 'AC-EIM0302152628185', '2026-07-01', '2028-07-01', 'https://drive.google.com/file/d/12e34feZYZLoDu3tTgaV_3XnAaWcgDL3o/view?usp=drivesdk', 'active'),
+  ('APARRI POLYTECHNIC INSTITUTE', 'Rizal Street, Maura, Aparri, Cagayan', 'Human Health / Health Care', 99, 'AC-BHS0202152628186', '2026-07-01', '2028-07-01', 'https://drive.google.com/file/d/1XU1M7KucZToQIBkfqdoVCxhROB2yblGv/view?usp=drivesdk', 'active'),
+  ('ITAWES SKILLS TRAINING CENTER', 'Centro Tuao East, Naruangan, Tuao, Cagayan', 'Tourism (Hotel and Restaurant)', 63, 'AC-HSK0202152628187', '2026-07-06', '2028-07-06', 'https://drive.google.com/file/d/1Tkdk2crxBA3rAQwsf1_nsFcKgPfoPZW8/view?usp=drivesdk', 'active'),
+  ('ITAWES SKILLS TRAINING CENTER', 'Centro Tuao East, Naruangan, Tuao, Cagayan', 'Tourism (Hotel and Restaurant)', 50, 'AC-FBS0202152628188', '2026-07-06', '2028-07-06', 'https://drive.google.com/file/d/1pMhcx7g7wsH9DC40mddOCvg6fzFP6X_4/view?usp=drivesdk', 'active'),
+  ('GEWILL''S PIAT TRAINING AND ASSESSMENT CENTER, INC.', 'Purok 2, Dugayung, Piat, Cagayan', 'Construction', 55, 'AC-FOR0202152628189', '2026-07-09', '2028-07-09', 'https://drive.google.com/file/d/1YjpxLXi1l0KGPE5jjI0Aksc1ykcWMMvq/view?usp=drivesdk', 'active'),
+  ('GEWILL''S PIAT TRAINING AND ASSESSMENT CENTER, INC.', 'Purok 2, Dugayung, Piat, Cagayan', 'Construction', 61, 'AC-WLO0202152628190', '2026-07-09', '2028-07-09', 'https://drive.google.com/file/d/12RlbA0HSMMXZAAu3sAAc_vUDdoltfZ0p/view?usp=drivesdk', 'active'),
+  ('GEWILL''S PIAT TRAINING AND ASSESSMENT CENTER, INC.', 'Purok 2, Dugayung, Piat, Cagayan', 'Construction', 58, 'AC-ROH0202152628191', '2026-07-09', '2028-07-09', 'https://drive.google.com/file/d/1h-8bM8NiCAjGHwU2kTBz3UYIQKpMujn3/view?usp=drivesdk', 'active'),
+  ('GEWILL''S PIAT TRAINING AND ASSESSMENT CENTER, INC.', 'Purok 2, Dugayung, Piat, Cagayan', 'Construction', 56, 'AC-HEO0202152628192', '2026-07-09', '2028-07-09', 'https://drive.google.com/file/d/1rHYBwJe3ZmxcNNU3s0i1lzZRNc6pu06c/view?usp=drivesdk', 'active'),
+  ('ARTIYA TRAINING CENTER, INC.', 'Rizal Street, Cabaritan West, Ballesteros, Cagayan', 'Construction', 55, 'AC-FOR0202152628193', '2026-07-13', '2028-07-13', 'https://drive.google.com/file/d/1b5SXEakXC9Zil7NC7ZVmw53fhzoreU2R/view?usp=drivesdk', 'active'),
+  ('PROVINCIAL TRAINING CENTER - CAGAYAN', 'Centro Sur, Gattaran, Cagayan', 'TVET', 85, 'AC-TRM0102152628194', '2026-08-05', '2028-08-05', 'https://drive.google.com/file/d/1oGU90OLl6HSr64oFm3vs5kGO3resi4S1/view?usp=drivesdk', 'active'),
+  ('CAGAYAN STATE UNIVERSITY GONZAGA', 'Flourishing, Gonzaga, Cagayan', 'Agriculture Forestry and Fishery', 22, 'AC-AHC0302152628195', '2026-08-25', '2028-08-25', 'https://drive.google.com/file/d/1i9eK53KxUN4w1q0YnngIR_EIbXIqs5kn/view?usp=drivesdk', 'active'),
+  ('INTERNATIONAL SCHOOL OF ASIA AND THE PACIFIC', 'Alimannao Hills, Peñablanca, Cagayan', 'Human Health / Health Care', 35, 'AC-CGV0202152527101', '2025-01-17', '2027-01-17', NULL, 'active'),
+  ('INTERNATIONAL SCHOOL OF ASIA AND THE PACIFIC', 'Alimannao Hills, Peñablanca, Cagayan', 'Electrical & Electronics', 38, 'AC-CSS0202152527102', '2025-01-17', '2027-01-17', NULL, 'active'),
+  ('SOUTHERN CAGAYAN RESEARCH CENTER', 'Minanga Norte, Iguig, Cagayan', 'Agriculture Forestry and Fishery', 78, 'AC-RMO0202152527103', '2025-01-27', '2027-01-27', NULL, 'active'),
+  ('CAGAYAN STATE UNIVERSITY PIAT', 'Baung, Piat, Cagayan', 'Agriculture Forestry and Fishery', 16, 'AC-ACP0102152527104', '2025-02-10', '2027-02-10', NULL, 'active'),
+  ('CAGAYAN STATE UNIVERSITY PIAT', 'Baung, Piat, Cagayan', 'Agriculture Forestry and Fishery', 25, 'AC-APS0202152527105', '2025-02-10', '2027-02-10', NULL, 'active'),
+  ('CAGAYAN STATE UNIVERSITY PIAT', 'Baung, Piat, Cagayan', 'Agriculture Forestry and Fishery', 19, 'AC-AGE0202152527106', '2025-02-10', '2027-02-10', NULL, 'active'),
+  ('SOLANA FRESH WATER FISHERY SCHOOL', 'Iraga, Solana, Cagayan', 'Agriculture Forestry and Fishery', 17, 'AC-ACP0202152527107', '2025-02-12', '2027-02-12', NULL, 'active'),
+  ('SOLANA FRESH WATER FISHERY SCHOOL', 'Iraga, Solana, Cagayan', 'Agriculture Forestry and Fishery', 71, 'AC-PMV0202152527108', '2025-02-12', '2027-02-12', NULL, 'active'),
+  ('CAGAYAN PROFICIENCY TRAINING CENTER INC.', '142 Maharlika Highway, Leonarda, Tuguegarao City, Cagayan', 'Tourism (Hotel and Restaurant)', 63, 'AC-HSK0202152527109', '2025-02-14', '2027-02-14', NULL, 'active'),
+  ('CAGAYAN PROFICIENCY TRAINING CENTER INC.', '142 Maharlika Highway, Leonarda, Tuguegarao City, Cagayan', 'Tourism (Hotel and Restaurant)', 84, 'AC-TPS0202152527110', '2025-02-14', '2027-02-14', NULL, 'active'),
+  ('APARRI POLYTECHNIC INSTITUTE', 'Rizal Street, Maura, Aparri, Cagayan', 'TVET', 87, 'AC-TRM0202152527111', '2025-02-17', '2027-02-17', NULL, 'active'),
+  ('APARRI POLYTECHNIC INSTITUTE', 'Rizal Street, Maura, Aparri, Cagayan', 'Agriculture Forestry and Fishery', 70, 'AC-OAP0202152527112', '2025-02-17', '2027-02-17', NULL, 'active'),
+  ('APARRI POLYTECHNIC INSTITUTE', 'Rizal Street, Maura, Aparri, Cagayan', 'Electrical & Electronics', 48, 'AC-EPA0202152527113', '2025-02-17', '2027-02-17', NULL, 'active'),
+  ('APARRI POLYTECHNIC INSTITUTE', 'Rizal Street, Maura, Aparri, Cagayan', 'Social, Community Development and Other Services', 40, 'AC-DOW0202152527114', '2025-02-17', '2027-02-17', NULL, 'active'),
+  ('APARRI POLYTECHNIC INSTITUTE', 'Rizal Street, Maura, Aparri, Cagayan', 'Human Health / Health Care', 35, 'AC-CGV0202152527115', '2025-02-17', '2027-02-17', NULL, 'active'),
+  ('LASAM INSTITUTE OF TECHNOLOGY', 'Nabannagan West, Lasam, Cagayan', 'TVET', 85, 'AC-TRM0102152527116', '2025-02-27', '2027-02-27', NULL, 'active'),
+  ('LASAM INSTITUTE OF TECHNOLOGY', 'Nabannagan West, Lasam, Cagayan', 'Garments', 41, 'AC-DRM0202152527117', '2025-02-27', '2027-02-27', NULL, 'active'),
+  ('LASAM INSTITUTE OF TECHNOLOGY', 'Nabannagan West, Lasam, Cagayan', 'Tourism (Hotel and Restaurant)', 50, 'AC-FBS0202152527118', '2025-02-27', '2027-02-27', NULL, 'active'),
+  ('LASAM INSTITUTE OF TECHNOLOGY', 'Nabannagan West, Lasam, Cagayan', 'Human Health / Health Care', 35, 'AC-CGV0202152527119', '2025-02-27', '2027-02-27', NULL, 'active'),
+  ('LASAM INSTITUTE OF TECHNOLOGY', 'Nabannagan West, Lasam, Cagayan', 'Tourism (Hotel and Restaurant)', 34, 'AC-BPP0202152527120', '2025-02-27', '2027-02-27', NULL, 'active'),
+  ('LASAM INSTITUTE OF TECHNOLOGY', 'Nabannagan West, Lasam, Cagayan', 'Metals and Engineering', 80, 'AC-EAW0202152527121', '2025-02-27', '2027-02-27', NULL, 'active'),
+  ('ARTIYA TRAINING CENTER, INC.', 'Rizal Street, Cabaritan West, Ballesteros, Cagayan', 'Construction', 61, 'AC-WLO0202152527122', '2025-02-28', '2027-02-28', NULL, 'active'),
+  ('ARTIYA TRAINING CENTER, INC.', 'Rizal Street, Cabaritan West, Ballesteros, Cagayan', 'Construction', 56, 'AC-HEO0202152527123', '2025-02-28', '2027-02-28', NULL, 'active'),
+  ('APARRI POLYTECHNIC INSTITUTE', 'Rizal Street, Maura, Aparri, Cagayan', 'Agriculture Forestry and Fishery', 19, 'AC-AGE0202152527124', '2025-03-06', '2027-03-06', NULL, 'active'),
+  ('APARRI POLYTECHNIC INSTITUTE', 'Rizal Street, Maura, Aparri, Cagayan', 'Automotive and Land Transportation', 43, 'AC-DRV0202152527125', '2025-03-06', '2027-03-06', NULL, 'active'),
+  ('APARRI POLYTECHNIC INSTITUTE', 'Rizal Street, Maura, Aparri, Cagayan', 'Tourism (Hotel and Restaurant)', 50, 'AC-FBS0202152527126', '2025-03-06', '2027-03-06', NULL, 'active'),
+  ('APARRI POLYTECHNIC INSTITUTE', 'Rizal Street, Maura, Aparri, Cagayan', 'TVET', 85, 'AC-TRM0102152527127', '2025-03-06', '2027-03-06', NULL, 'active'),
+  ('APARRI POLYTECHNIC INSTITUTE', 'Rizal Street, Maura, Aparri, Cagayan', 'Social, Community Development and Other Services', 32, 'AC-BCN0202152527128', '2025-03-07', '2027-03-07', NULL, 'active'),
+  ('APARRI POLYTECHNIC INSTITUTE', 'Rizal Street, Maura, Aparri, Cagayan', 'Metals and Engineering', 80, 'AC-EAW0202152527129', '2025-03-07', '2027-03-07', NULL, 'active'),
+  ('CAGAYAN STATE UNIVERSITY PIAT', 'Baung, Piat, Cagayan', 'Agriculture Forestry and Fishery', 20, 'AC-AGE0302152527130', '2025-03-14', '2027-03-14', NULL, 'active'),
+  ('CAGAYAN STATE UNIVERSITY PIAT', 'Baung, Piat, Cagayan', 'Agriculture Forestry and Fishery', 21, 'AC-AGE0402152527131', '2025-03-14', '2027-03-14', NULL, 'active'),
+  ('CAGAYAN STATE UNIVERSITY PIAT', 'Baung, Piat, Cagayan', 'Automotive and Land Transportation', 43, 'AC-DRV0202152527132', '2025-03-14', '2027-03-14', NULL, 'active'),
+  ('CAGAYAN STATE UNIVERSITY LASAM', 'Centro 2, Lasam, Cagayan', 'Tourism (Hotel and Restaurant)', 34, 'AC-BPP0202152527133', '2025-03-21', '2027-03-21', NULL, 'active'),
+  ('CAGAYAN STATE UNIVERSITY LASAM', 'Centro 2, Lasam, Cagayan', 'Automotive and Land Transportation', 43, 'AC-DRV0202152527134', '2025-03-21', '2027-03-21', NULL, 'active'),
+  ('CAGAYAN STATE UNIVERSITY CARIG', 'Carig Sur, Tuguegarao City, Cagayan', 'Electrical & Electronics', 46, 'AC-EIM0202152527135', '2025-04-10', '2027-04-10', NULL, 'active'),
+  ('OUR LADY OF FATIMA INTEGRATED SCHOOL OF DUGO, INC.', 'Dugo, Camalaniugan, Cagayan', 'Agriculture Forestry and Fishery', 19, 'AC-AGE0202152527136', '2025-04-10', '2027-04-10', NULL, 'active'),
+  ('LYCEUM OF APARRI INC.', 'Macanaya, Aparri, Cagayan', 'Human Health / Health Care', 35, 'AC-CGV0202152527137', '2025-04-11', '2027-04-11', NULL, 'active'),
+  ('LYCEUM OF APARRI INC.', 'Macanaya, Aparri, Cagayan', 'Human Health / Health Care', 88, 'AC-HCS0202152527138', '2025-04-11', '2027-04-11', NULL, 'active'),
+  ('CAGAYAN STATE UNIVERSITY ANDREWS', 'Caritan Sur, Andrews Campus, Tuguegarao City', 'Tourism (Hotel and Restaurant)', 50, 'AC-FBS0202152527139', '2025-04-14', '2027-04-14', NULL, 'active'),
+  ('CAGAYAN STATE UNIVERSITY APARRI', 'Maura, Aparri, Cagayan', 'Electrical & Electronics', 48, 'AC-EPA0202152527140', '2025-04-11', '2027-04-11', NULL, 'active'),
+  ('UNIVERSITY OF SAINT LOUIS, INC.', 'Leonarda, Tuguegarao City, Cagayan', 'Tourism (Hotel and Restaurant)', 50, 'AC-FBS0202152527141', '2025-04-14', '2027-04-14', NULL, 'active'),
+  ('UNIVERSITY OF SAINT LOUIS, INC.', 'Leonarda, Tuguegarao City, Cagayan', 'Tourism (Hotel and Restaurant)', 63, 'AC-HSK0202152527142', '2025-04-14', '2027-04-14', NULL, 'active'),
+  ('REGIONAL TRAINING CENTER', 'Carig Norte, Tuguegarao City, Cagayan', 'Automotive and Land Transportation', 27, 'AC-ATS0202152527143', '2025-04-28', '2027-04-28', NULL, 'active'),
+  ('CAGAYAN STATE UNIVERSITY LASAM', 'Centro 2, Lasam, Cagayan', 'Electrical & Electronics', 48, 'AC-EPA0202152527144', '2025-04-28', '2027-04-28', NULL, 'active'),
+  ('APARRI POLYTECHNIC INSTITUTE', 'Rizal Street, Maura, Aparri, Cagayan', 'Electrical & Electronics', 46, 'AC-EIM0202152527145', '2025-05-05', '2027-05-05', NULL, 'active'),
+  ('DEPARTMENT OF PUBLIC WORKS AND HIGHWAYS', 'Regional Government Center, Carig Sur, Tuguegarao City, Cagayan', 'Construction', 58, 'AC-ROH0202152527146', '2025-05-06', '2027-05-06', NULL, 'active'),
+  ('DBJ SKILLS TRAINING CENTER, INC.', 'Buntun, Tuguegarao City, Cagayan', 'Construction', 59, 'AC-RRO0202152527147', '2025-05-14', '2027-05-14', NULL, 'active'),
+  ('ALLACAPAN VOCATIONAL HIGH SCHOOL', 'Centro West, Allacapan, Cagayan', 'Social, Community Development and Other Services', 32, 'AC-BCN0202152527148', '2025-05-28', '2027-05-28', NULL, 'active'),
+  ('PROVINCIAL TRAINING CENTER - CAGAYAN', 'Centro Sur, Gattaran, Cagayan', 'Construction', 83, 'AC-TIL0202152527149', '2025-05-30', '2027-05-30', NULL, 'active'),
+  ('TAMARAW ACADEMY INC.', 'Dumpao, Iguig, Cagayan', 'Electrical & Electronics', 46, 'AC-EIM0202152527150', '2025-06-13', '2027-06-13', NULL, 'active'),
+  ('TAMARAW ACADEMY INC.', 'Dumpao, Iguig, Cagayan', 'Construction', 75, 'AC-PVI0202152527151', '2025-06-13', '2027-06-13', NULL, 'active'),
+  ('APARRI POLYTECHNIC INSTITUTE', 'Rizal Street, Maura, Aparri, Cagayan', 'Tourism (Hotel and Restaurant)', 34, 'AC-BPP0202152527152', '2025-06-06', '2027-06-06', NULL, 'active'),
+  ('APARRI POLYTECHNIC INSTITUTE', 'Rizal Street, Maura, Aparri, Cagayan', 'Garments', 41, 'AC-DRM0202152527153', '2025-06-06', '2027-06-06', NULL, 'active'),
+  ('APARRI POLYTECHNIC INSTITUTE', 'Rizal Street, Maura, Aparri, Cagayan', 'Garments', 81, 'AC-TLR0202152527154', '2025-06-06', '2027-06-06', NULL, 'active'),
+  ('CAGAYAN STATE UNIVERSITY CARIG', 'Carig Sur, Tuguegarao City, Cagayan', 'Electrical & Electronics', 46, 'AC-EIM0202152527155', '2025-06-20', '2027-06-20', NULL, 'active'),
+  ('REGIONAL TRAINING CENTER', 'Carig Norte, Tuguegarao City, Cagayan', 'tourism (Hotel and Restaurant)', 39, 'AC-COK0202152527156', '2025-06-23', '2027-06-23', NULL, 'active'),
+  ('REGIONAL TRAINING CENTER', 'Carig Norte, Tuguegarao City, Cagayan', 'Tourism (Hotel and Restaurant)', 63, 'AC-HSK0202152527157', '2025-06-23', '2027-06-23', NULL, 'active'),
+  ('REGIONAL TRAINING CENTER', 'Carig Norte, Tuguegarao City, Cagayan', 'Automotive and Land Transportation', 69, 'AC-MSE0202152527158', '2025-06-23', '2027-06-23', NULL, 'active'),
+  ('MILEAGE DEVELOPMENT AND TRAINING CENTER, INC.', 'Pallua Norte, Tuguegarao City, Cagayan', 'Construction', 56, 'AC-HEO0202152527159', '2025-06-20', '2027-06-20', NULL, 'active'),
+  ('MILEAGE DEVELOPMENT AND TRAINING CENTER, INC.', 'Pallua Norte, Tuguegarao City, Cagayan', 'Construction', 61, 'AC-WLO0202152527160', '2025-06-20', '2027-06-20', NULL, 'active'),
+  ('TUGUEGARAO TRAINING AND ASSESSMENT CENTER INC.', '#50 Quirino Street, San Gabriel, Tuguegarao City', 'Electrical & Electronics', 48, 'AC-EPA0202152527161', '2025-07-03', '2027-07-03', NULL, 'active'),
+  ('TUGUEGARAO TRAINING AND ASSESSMENT CENTER INC.', '#50 Quirino Street, San Gabriel, Tuguegarao City', 'Automotive and Land Transportation', 27, 'AC-ATS0202152527162', '2025-07-03', '2027-07-03', NULL, 'active'),
+  ('JOL TECHNICAL TRAINING AND ASSESSMENT CENTER, INC.', 'Maharlika Highway, Zone 6, Tallungan, Aparri, Cagayan', 'Construction', 57, 'AC-MGO0202152527163', '2025-07-11', '2027-07-11', NULL, 'active'),
+  ('MERCEDES INTEGRATED FARM AND SKILLS DEVELOPMENT CENTER, INC.', 'Palagao Norte, Gattaran, Cagayan', 'Agriculture Forestry and Fishery', 17, 'AC-ACP0202152527164', '2025-07-11', '2027-07-11', NULL, 'active'),
+  ('MERCEDES INTEGRATED FARM AND SKILLS DEVELOPMENT CENTER, INC.', 'Palagao Norte, Gattaran, Cagayan', 'Agriculture Forestry and Fishery', 70, 'AC-OAP0202152527165', '2025-07-11', '2027-07-11', NULL, 'active'),
+  ('CAGAYAN PROFICIENCY TRAINING CENTER INC.', '142 Maharlika Highway, Leonarda, Tuguegarao City, Cagayan', 'Tourism (Hotel and Restaurant)', 31, 'AC-BAR0202152527166', '2025-07-21', '2027-07-21', NULL, 'active'),
+  ('CAGAYAN PROFICIENCY TRAINING CENTER INC.', '142 Maharlika Highway, Leonarda, Tuguegarao City, Cagayan', 'Tourism (Hotel and Restaurant)', 49, 'AC-EVM0302152527167', '2025-07-21', '2027-07-21', NULL, 'active'),
+  ('CAGAYAN PROFICIENCY TRAINING CENTER INC.', '142 Maharlika Highway, Leonarda, Tuguegarao City, Cagayan', 'Tourism (Hotel and Restaurant)', 50, 'AC-FBS0202152527168', '2025-07-21', '2027-07-21', NULL, 'active'),
+  ('CAGAYAN PROFICIENCY TRAINING CENTER INC.', '142 Maharlika Highway, Leonarda, Tuguegarao City, Cagayan', 'Tourism (Hotel and Restaurant)', 34, 'AC-BPP0202152527169', '2025-07-21', '2027-07-21', NULL, 'active'),
+  ('PHARMASSIST TRAINING AND ASSESSMENT CENTER', '80 Provincial Road, Buntun, Tuguegarao City, Cagayan', 'Human Health / Health Care', 72, 'AC-PHA0302152527170', '2025-07-11', '2027-07-11', NULL, 'active'),
+  ('REGIONAL TRAINING CENTER', 'Carig Norte, Tuguegarao City, Cagayan', 'Automotive and Land Transportation', 89, 'AC-ATP02021522527171', '2025-07-29', '2027-07-29', NULL, 'active'),
+  ('REGIONAL TRAINING CENTER', 'Carig Norte, Tuguegarao City, Cagayan', 'Electrical & Electronics', 48, 'AC-EPA0202152527172', '2025-07-29', '2027-07-29', NULL, 'active'),
+  ('REGIONAL TRAINING CENTER', 'Carig Norte, Tuguegarao City, Cagayan', 'Metals and Engineering', 80, 'AC-EAW0202152527173', '2025-07-29', '2027-07-29', NULL, 'active'),
+  ('REGIONAL TRAINING CENTER', 'Carig Norte, Tuguegarao City, Cagayan', 'Construction', 66, 'AC-MAS0202152527174', '2025-07-29', '2027-07-29', NULL, 'active'),
+  ('REGIONAL TRAINING CENTER', 'Carig Norte, Tuguegarao City, Cagayan', 'Construction', 90, 'AC-MAS0302152527175', '2025-07-29', '2027-07-29', NULL, 'active'),
+  ('REGIONAL TRAINING CENTER', 'Carig Norte, Tuguegarao City, Cagayan', 'Construction', 36, 'AC-CAR0202152527176', '2025-07-29', '2027-07-29', NULL, 'active'),
+  ('REGIONAL TRAINING CENTER', 'Carig Norte, Tuguegarao City, Cagayan', 'Construction', 37, 'AC-CAR0302152527177', '2025-07-29', '2027-07-29', NULL, 'active'),
+  ('CAGAYAN STATE UNIVERSITY PIAT', 'Baung, Piat, Cagayan', 'Agriculture Forestry and Fishery', 24, 'AC-APR0202152527178', '2025-08-04', '2027-08-04', NULL, 'active'),
+  ('LASAM INSTITUTE OF TECHNOLOGY', 'Nabannagan West, Lasam, Cagayan', 'Agriculture Forestry and Fishery', 16, 'AC-ACP0102152527179', '2025-08-11', '2027-08-11', NULL, 'active'),
+  ('LASAM INSTITUTE OF TECHNOLOGY', 'Nabannagan West, Lasam, Cagayan', 'Agriculture Forestry and Fishery', 17, 'AC-ACP0202152527180', '2025-08-11', '2027-08-11', NULL, 'active'),
+  ('LASAM INSTITUTE OF TECHNOLOGY', 'Nabannagan West, Lasam, Cagayan', 'tourism (Hotel and Restaurant)', 39, 'AC-COK0202152527181', '2025-08-11', '2027-08-11', NULL, 'active'),
+  ('BAGGAO NATIONAL AGRICULTURAL SCHOOL', 'Tallang, Baggao, Cagayan', 'Tourism (Hotel and Restaurant)', 34, 'AC-BPP0202152527182', '2025-08-26', '2027-08-26', NULL, 'active'),
+  ('REGIONAL TRAINING CENTER', 'Carig Norte, Tuguegarao City, Cagayan', 'Construction', 91, 'AC-SCA0202152527183', '2025-09-11', '2027-09-11', NULL, 'active'),
+  ('PROVINCIAL TRAINING CENTER - CAGAYAN', 'Centro Sur, Gattaran, Cagayan', 'Tourism (Hotel and Restaurant)', 34, 'AC-BPP0202152527184', '2025-09-15', '2027-09-15', NULL, 'active'),
+  ('MAC-VIN DRIVING SCHOOL, INC.', 'St. Stephen Street, Ugac Sur, Tuguegarao City, Cagayan', 'Automotive and Land Transportation', 43, 'AC-DRV0202152527185', '2025-09-17', '2027-09-17', NULL, 'active'),
+  ('REGIONAL TRAINING CENTER', 'Carig Norte, Tuguegarao City, Cagayan', 'Construction', 92, 'AC-RSW0202152527186', '2025-09-29', '2027-09-29', NULL, 'active'),
+  ('APARRI POLYTECHNIC INSTITUTE', 'Rizal Street, Maura, Aparri, Cagayan', 'Automotive and Land Transportation', 28, 'AC-ATS0102152527187', '2025-09-29', '2027-09-29', NULL, 'active'),
+  ('CAGAYAN STATE UNIVERSITY SANCHEZ MIRA', 'Centro 2, Sanchez Mira, Cagayan', 'Tourism (Hotel and Restaurant)', 53, 'AC-FOS0202152527188', '2025-10-10', '2027-10-10', NULL, 'active'),
+  ('CAGAYAN STATE UNIVERSITY SANCHEZ MIRA', 'Centro 2, Sanchez Mira, Cagayan', 'Tourism (Hotel and Restaurant)', 49, 'AC-EVM0302152527189', '2025-10-10', '2027-10-10', NULL, 'active'),
+  ('LASAM INSTITUTE OF TECHNOLOGY', 'Nabannagan West, Lasam, Cagayan', 'Processed Food & Beverages', 52, 'AC-FOP0202152527190', '2025-10-17', '2027-10-17', NULL, 'active'),
+  ('LASAM INSTITUTE OF TECHNOLOGY', 'Nabannagan West, Lasam, Cagayan', 'Agriculture Forestry and Fishery', 23, 'AC-APP0202152527191', '2025-10-17', '2027-10-17', NULL, 'active'),
+  ('REGIONAL TRAINING CENTER', 'Carig Norte, Tuguegarao City, Cagayan', 'Electrical & Electronics', 46, 'AC-EIM0202152527192', '2025-10-24', '2027-10-24', NULL, 'active'),
+  ('REGIONAL TRAINING CENTER', 'Carig Norte, Tuguegarao City, Cagayan', 'Automotive and Land Transportation', 43, 'AC-DRV0202152527193', '2025-10-24', '2027-10-24', NULL, 'active'),
+  ('REGIONAL TRAINING CENTER', 'Carig Norte, Tuguegarao City, Cagayan', 'TVET', 85, 'AC-TRM0102152527194', '2025-10-24', '2027-10-24', NULL, 'active'),
+  ('CAGAYAN STATE UNIVERSITY CARIG', 'Carig Sur, Tuguegarao City, Cagayan', 'Human Health / Health Care', 62, 'AC-HIL0202152527195', '2025-10-27', '2027-10-27', NULL, 'active'),
+  ('DOÑA AMPARO TRAINING AND ASSESSMENT CENTER INC.', 'Daan-ili, Allacapan, Cagayan', 'Agriculture Forestry and Fishery', 17, 'AC-ACP0202152527196', '2025-10-27', '2027-10-27', NULL, 'active'),
+  ('DOÑA AMPARO TRAINING AND ASSESSMENT CENTER INC.', 'Daan-ili, Allacapan, Cagayan', 'Agriculture Forestry and Fishery', 23, 'AC-APP0202152527197', '2025-10-27', '2027-10-27', NULL, 'active'),
+  ('DOÑA AMPARO TRAINING AND ASSESSMENT CENTER INC.', 'Daan-ili, Allacapan, Cagayan', 'Agriculture Forestry and Fishery', 70, 'AC-OAP0202152527198', '2025-10-27', '2027-10-27', NULL, 'active'),
+  ('APARRI POLYTECHNIC INSTITUTE', 'Rizal Street, Maura, Aparri, Cagayan', 'Construction', 83, 'AC-TIL0202152527199', '2025-11-14', '2027-11-14', NULL, 'active'),
+  ('CLAVERIA SCHOOL OF ARTS AND TRADES', 'Centro 01, Claveria, Cagayan', 'Tourism (Hotel and Restaurant)', 34, 'AC-BPP0202152527200', '2025-11-14', '2027-11-14', NULL, 'active'),
+  ('LAL-LO NATIONAL HIGH SCHOOL', 'Centro, Lal-lo, Cagayan', 'tourism (Hotel and Restaurant)', 39, 'AC-COK0202152527201', '2025-11-20', '2027-11-20', NULL, 'active'),
+  ('APARRI POLYTECHNIC INSTITUTE', 'Rizal Street, Maura, Aparri, Cagayan', 'Construction', 37, 'AC-CAR0302152527202', '2025-11-24', '2027-11-24', NULL, 'active'),
+  ('APARRI POLYTECHNIC INSTITUTE', 'Rizal Street, Maura, Aparri, Cagayan', 'Human Health / Health Care', 62, 'AC-HIL0202152527203', '2025-11-24', '2027-11-24', NULL, 'active')
+on conflict (cert_number) do update set
+  center_name = excluded.center_name,
+  address = excluded.address,
+  sector = excluded.sector,
+  qualification_id = excluded.qualification_id,
+  issuance_date = excluded.issuance_date,
+  expiration_date = excluded.expiration_date,
+  cert_url = coalesce(excluded.cert_url, public.assessment_centers.cert_url);

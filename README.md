@@ -30,7 +30,7 @@ existing phpMyAdmin/MariaDB dump — see [`supabase/schema.sql`](./supabase/sche
 spreadsheet (`AC_MONITORING_2026.xlsx`, `2025`/`2026` tabs) and does three
 things:
 
-1. Adds `center_name`, `address`, and `sector` columns to
+1. Adds `center_name` and `address` columns to
    `assessment_centers` so a historical record can stand on its own without
    a linked portal account (`user_id` stays null for these).
 2. Fixes 16 qualifications whose `level` column didn't match their own name
@@ -42,7 +42,9 @@ things:
    matched against the qualifications catalog by code + corrected level,
    adding the one qualification genuinely missing from the catalog
    (Barangay Health Services NC II). The 2026 batch includes a Google Drive
-   link to each signed certificate, carried over into `cert_url`.
+   link to each signed certificate, carried over into `cert_url`. Sector
+   lives only on `qualifications.description` — not duplicated per
+   center — reached via the `qualification_id` join.
 
 Every read path that displays a center's name (Admin → Centers/Accredited/Certificate
 of accreditation) falls back to `center_name`/`address` when there's no

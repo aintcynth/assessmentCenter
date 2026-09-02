@@ -176,7 +176,6 @@ create table if not exists public.assessment_centers (
   status text default 'active' check (status in ('active', 'inactive')),
   center_name text,   -- standalone name for records with no linked portal account
   address text,       -- (e.g. bulk-imported historical/legacy accreditation records)
-  sector text,
   created_at timestamptz not null default now()
 );
 

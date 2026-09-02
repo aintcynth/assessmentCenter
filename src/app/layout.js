@@ -1,7 +1,7 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Assessment Center Accreditation Portal",
+  title: "AC Accreditation Portal",
   description: "Apply for, review, and issue assessment center accreditation.",
 };
 

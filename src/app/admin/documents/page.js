@@ -9,7 +9,7 @@ import DocumentTypeTag from "@/components/DocumentTypeTag";
 // prerendering (which runs at build time, before env vars may be wired up).
 export const dynamic = "force-dynamic";
 
-const KIND_OPTIONS = ["All types", "Application document", "Inspection report", "Receipt of payment", "AOU"];
+const KIND_OPTIONS = ["All types", "Application document", "Pre-notification letter", "Inspection report", "Receipt of payment", "AOU"];
 
 export default function AdminDocumentsPage() {
   const supabase = createClient();
@@ -40,7 +40,11 @@ export default function AdminDocumentsPage() {
 
       const [{ data: docs }, { data: inspections }, { data: payments }] = await Promise.all([
         supabase.from("assessment_application_documents").select("*").in("application_id", appIds),
-        supabase.from("inspections").select("*").in("application_id", appIds).not("report_url", "is", null),
+        supabase
+          .from("inspections")
+          .select("*")
+          .in("application_id", appIds)
+          .or("report_url.not.is.null,notification_pdf_url.not.is.null"),
         supabase.from("payment_submissions").select("*").in("application_id", appIds),
       ]);
 
@@ -61,15 +65,28 @@ export default function AdminDocumentsPage() {
 
       (inspections || []).forEach((insp) => {
         const app = appById[insp.application_id];
-        all.push({
-          id: `insp-${insp.id}`,
-          kind: "Inspection report",
-          label: `Signed report — ${insp.inspection_date || "inspection"}`,
-          url: insp.report_url,
-          uploaded_at: insp.updated_at || insp.created_at,
-          applicant: app?.profiles?.ac_name,
-          qualification: app?.qualifications?.name,
-        });
+        if (insp.notification_pdf_url) {
+          all.push({
+            id: `notif-${insp.id}`,
+            kind: "Pre-notification letter",
+            label: `Pre-inspection notification — ${insp.inspection_date || "inspection"}`,
+            url: insp.notification_pdf_url,
+            uploaded_at: insp.created_at,
+            applicant: app?.profiles?.ac_name,
+            qualification: app?.qualifications?.name,
+          });
+        }
+        if (insp.report_url) {
+          all.push({
+            id: `insp-${insp.id}`,
+            kind: "Inspection report",
+            label: `Signed report — ${insp.inspection_date || "inspection"}`,
+            url: insp.report_url,
+            uploaded_at: insp.updated_at || insp.created_at,
+            applicant: app?.profiles?.ac_name,
+            qualification: app?.qualifications?.name,
+          });
+        }
       });
 
       (payments || []).forEach((pay) => {

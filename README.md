@@ -62,8 +62,12 @@ spreadsheet changes and you want to reimport).
 2. **Documents review** — admin approves or declines. Declined applications
    (`status = 'denied'`) show the admin's remarks; the client can add more
    documents and resubmit, which flips the status back to `pending`.
-3. **Inspection** — once approved, the admin sets an inspection date and
-   assigns an expert (a new row in `inspections`, `status = 'inspection_scheduled'`).
+3. **Inspection** — once approved, the admin sets an inspection date, time,
+   and assigns an expert (a new row in `inspections`, `status =
+   'inspection_scheduled'`). This automatically generates a Pre-Inspection
+   Letter of Notification (TESDA-OP-CO-03-F06, `src/lib/preNotificationPdf.js`)
+   as a PDF, uploads it, and notifies the client — viewable inline on both
+   sides via the PDF viewer.
 4. **Compliance check** — after the visit, the admin uploads the signed
    inspection report and marks the inspection compliant or not.
    - **Non-compliant**: lackings are recorded on that `inspections` row: the
@@ -137,6 +141,7 @@ Notes on the migration:
      and [`supabase/005_app_settings.sql`](./supabase/005_app_settings.sql),
      then optionally [`supabase/006_import_legacy_centers.sql`](./supabase/006_import_legacy_centers.sql)
      if you want the historical 2025/2026 accredited-center records imported (see below),
+     then [`supabase/007_pre_notification.sql`](./supabase/007_pre_notification.sql),
      which additively add everything from the inspection cycle through
      certificate issuance without touching your existing data.
 3. In **Project Settings → API**, copy the **Project URL** and **anon public

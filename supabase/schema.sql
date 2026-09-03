@@ -95,8 +95,10 @@ create table if not exists public.inspections (
   id uuid primary key default gen_random_uuid(),
   application_id uuid not null references public.assessment_applications (id) on delete cascade,
   inspection_date date,
+  inspection_time text,
   expert_name text,
   report_url text,          -- signed inspection report, uploaded by admin
+  notification_pdf_url text, -- generated pre-inspection notification letter
   compliant boolean,         -- null = outcome not yet recorded
   lackings text,             -- admin's notes when compliant = false
   created_at timestamptz not null default now(),

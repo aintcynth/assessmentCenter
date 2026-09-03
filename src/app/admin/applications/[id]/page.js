@@ -13,6 +13,7 @@ import { notifyUser } from "@/lib/notifications";
 import { generateCertificatePdf, generateAouPdf } from "@/lib/certificatePdf";
 import { loadImageAsPngDataUrl } from "@/lib/loadImage";
 import { generateCertNumber, previewCertNumber } from "@/lib/certNumber";
+import { generatePreNotificationPdf } from "@/lib/preNotificationPdf";
 
 // Client-only Supabase calls happen at render time, so skip static
 // prerendering (which runs at build time, before env vars may be wired up).
@@ -35,6 +36,7 @@ export default function AdminApplicationDetailPage() {
   const [reason, setReason] = useState("");
   const [inspectorName, setInspectorName] = useState("");
   const [scheduledDate, setScheduledDate] = useState("");
+  const [scheduledTime, setScheduledTime] = useState("");
   const [reportFile, setReportFile] = useState(null);
   const [lackings, setLackings] = useState("");
 
@@ -195,10 +197,27 @@ export default function AdminApplicationDetailPage() {
       const user = await currentAdmin();
       const isReinspection = inspections.length > 0;
 
+      const letterBlob = generatePreNotificationPdf({
+        acManager: app.profiles?.ac_manager,
+        centerName: app.profiles?.ac_name,
+        address: app.profiles?.address,
+        qualificationName: app.qualifications?.name,
+        inspectionDate: scheduledDate,
+        inspectionTime: scheduledTime,
+      });
+      const letterPath = `${user.id}/${id}/pre-notification-${Date.now()}.pdf`;
+      const { error: letterUploadError } = await supabase.storage
+        .from("accreditation-files")
+        .upload(letterPath, letterBlob, { contentType: "application/pdf" });
+      if (letterUploadError) throw letterUploadError;
+      const notificationUrl = supabase.storage.from("accreditation-files").getPublicUrl(letterPath).data.publicUrl;
+
       const { error: insertError } = await supabase.from("inspections").insert({
         application_id: id,
         inspection_date: scheduledDate,
+        inspection_time: scheduledTime,
         expert_name: inspectorName,
+        notification_pdf_url: notificationUrl,
       });
       if (insertError) throw insertError;
 
@@ -208,16 +227,24 @@ export default function AdminApplicationDetailPage() {
         .eq("id", id);
       if (updateError) throw updateError;
 
+      await notifyUser(supabase, {
+        userId: app.user_id,
+        applicationId: id,
+        title: isReinspection ? "Reinspection scheduled" : "Inspection scheduled",
+        message: `Your pre-inspection notification letter is ready to view — inspection set for ${scheduledDate} at ${scheduledTime}.`,
+      });
+
       await logActivity(supabase, {
         applicationId: id,
         actorId: user.id,
         actorName: profile?.ac_name,
         action: isReinspection ? "Reinspection scheduled" : "Inspection scheduled",
-        notes: `${scheduledDate} with ${inspectorName}`,
+        notes: `${scheduledDate} ${scheduledTime} with ${inspectorName} — pre-notification letter generated`,
       });
 
       setInspectorName("");
       setScheduledDate("");
+      setScheduledTime("");
       await load();
     } catch (err) {
       setError(err.message);
@@ -605,6 +632,15 @@ export default function AdminApplicationDetailPage() {
       uploaded_at: d.uploaded_at,
     })),
     ...inspections
+      .filter((insp) => insp.notification_pdf_url)
+      .map((insp) => ({
+        id: `notif-${insp.id}`,
+        kind: "Pre-notification letter",
+        label: `Pre-inspection notification — ${insp.inspection_date || "inspection"}`,
+        url: insp.notification_pdf_url,
+        uploaded_at: insp.created_at,
+      })),
+    ...inspections
       .filter((insp) => insp.report_url)
       .map((insp) => ({
         id: `insp-${insp.id}`,
@@ -719,7 +755,7 @@ export default function AdminApplicationDetailPage() {
           {app.status === "inspection_scheduled" && !latestInspection && (
             <form onSubmit={handleScheduleInspection} className="card space-y-4">
               <h2 className="font-display text-lg font-semibold text-seal">Set inspection date</h2>
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-3">
                 <div>
                   <label className="label">Expert</label>
                   <input
@@ -739,7 +775,20 @@ export default function AdminApplicationDetailPage() {
                     onChange={(e) => setScheduledDate(e.target.value)}
                   />
                 </div>
+                <div>
+                  <label className="label">Inspection time</label>
+                  <input
+                    type="time"
+                    required
+                    className="input-field"
+                    value={scheduledTime}
+                    onChange={(e) => setScheduledTime(e.target.value)}
+                  />
+                </div>
               </div>
+              <p className="text-xs text-ink/50">
+                Scheduling also generates the pre-inspection notification letter automatically.
+              </p>
               <button type="submit" disabled={busy} className="btn-primary">
                 Schedule inspection
               </button>
@@ -750,8 +799,12 @@ export default function AdminApplicationDetailPage() {
             <div className="card space-y-4">
               <h2 className="font-display text-lg font-semibold text-seal">Compliant?</h2>
               <p className="text-sm text-ink/60">
-                Inspected {latestInspection.inspection_date} by {latestInspection.expert_name}
+                Inspected {latestInspection.inspection_date} {latestInspection.inspection_time} by{" "}
+                {latestInspection.expert_name}
               </p>
+              {latestInspection.notification_pdf_url && (
+                <PdfViewer url={latestInspection.notification_pdf_url} title="Pre-inspection notification letter" height={340} />
+              )}
               <label className="label">Inspection report (optional)</label>
               <input
                 type="file"
@@ -783,7 +836,7 @@ export default function AdminApplicationDetailPage() {
                 {latestInspection.lackings}
               </div>
               <h3 className="font-medium text-seal">Schedule reinspection</h3>
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-3">
                 <div>
                   <label className="label">Expert</label>
                   <input
@@ -801,6 +854,16 @@ export default function AdminApplicationDetailPage() {
                     className="input-field"
                     value={scheduledDate}
                     onChange={(e) => setScheduledDate(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="label">Reinspection time</label>
+                  <input
+                    type="time"
+                    required
+                    className="input-field"
+                    value={scheduledTime}
+                    onChange={(e) => setScheduledTime(e.target.value)}
                   />
                 </div>
               </div>

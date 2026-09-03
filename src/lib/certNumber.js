@@ -6,17 +6,28 @@ export function levelToCode(level) {
 
 // The sequence starts at 101 and increments by 1 for every certificate
 // issued in the same calendar year (by issuance date), shared across every
-// qualification — not reset per qualification.
+// qualification — not reset per qualification. Checks both applications
+// generated through the normal flow AND assessment_centers directly (e.g.
+// bulk-imported legacy/historical records), so imported numbers are never
+// collided with.
 export async function nextSequenceForYear(supabase, year) {
-  const { data } = await supabase
-    .from("assessment_applications")
-    .select("cert_number")
-    .gte("issuance_date", `${year}-01-01`)
-    .lte("issuance_date", `${year}-12-31`)
-    .not("cert_number", "is", null);
+  const [appsResult, centersResult] = await Promise.all([
+    supabase
+      .from("assessment_applications")
+      .select("cert_number")
+      .gte("issuance_date", `${year}-01-01`)
+      .lte("issuance_date", `${year}-12-31`)
+      .not("cert_number", "is", null),
+    supabase
+      .from("assessment_centers")
+      .select("cert_number")
+      .gte("issuance_date", `${year}-01-01`)
+      .lte("issuance_date", `${year}-12-31`)
+      .not("cert_number", "is", null),
+  ]);
 
   let max = 100;
-  (data || []).forEach((row) => {
+  [...(appsResult.data || []), ...(centersResult.data || [])].forEach((row) => {
     const match = row.cert_number?.match(/(\d{3})$/);
     if (match) {
       const n = parseInt(match[1], 10);

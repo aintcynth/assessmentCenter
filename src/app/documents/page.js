@@ -46,7 +46,7 @@ export default function DocumentsPage() {
             .from("inspections")
             .select("*")
             .in("application_id", appIds)
-            .or("report_url.not.is.null,notification_pdf_url.not.is.null")
+            .or("report_url.not.is.null,notification_pdf_url.not.is.null,signed_notification_pdf_url.not.is.null")
             .order("created_at", { ascending: false }),
           supabase.from("payment_submissions").select("*").in("application_id", appIds),
         ]);
@@ -62,13 +62,13 @@ export default function DocumentsPage() {
         });
 
         (inspections || []).forEach((insp) => {
-          if (insp.notification_pdf_url) {
+          if (insp.signed_notification_pdf_url) {
             filesByApp[insp.application_id]?.push({
               id: `notif-${insp.id}`,
               kind: "Pre-notification letter",
               label: `Pre-inspection notification — ${insp.inspection_date || "inspection"}`,
-              url: insp.notification_pdf_url,
-              uploaded_at: insp.created_at,
+              url: insp.signed_notification_pdf_url,
+              uploaded_at: insp.updated_at || insp.created_at,
             });
           }
           if (insp.report_url) {

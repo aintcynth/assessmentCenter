@@ -98,7 +98,8 @@ create table if not exists public.inspections (
   inspection_time text,
   expert_name text,
   report_url text,          -- signed inspection report, uploaded by admin
-  notification_pdf_url text, -- generated pre-inspection notification letter
+  notification_pdf_url text, -- generated pre-inspection notification letter (unsigned draft)
+  signed_notification_pdf_url text, -- admin-uploaded signed version; the only one clients see
   compliant boolean,         -- null = outcome not yet recorded
   lackings text,             -- admin's notes when compliant = false
   created_at timestamptz not null default now(),

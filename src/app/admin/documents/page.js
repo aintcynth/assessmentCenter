@@ -44,7 +44,7 @@ export default function AdminDocumentsPage() {
           .from("inspections")
           .select("*")
           .in("application_id", appIds)
-          .or("report_url.not.is.null,notification_pdf_url.not.is.null"),
+          .or("report_url.not.is.null,notification_pdf_url.not.is.null,signed_notification_pdf_url.not.is.null"),
         supabase.from("payment_submissions").select("*").in("application_id", appIds),
       ]);
 
@@ -69,9 +69,20 @@ export default function AdminDocumentsPage() {
           all.push({
             id: `notif-${insp.id}`,
             kind: "Pre-notification letter",
-            label: `Pre-inspection notification — ${insp.inspection_date || "inspection"}`,
+            label: `Pre-inspection notification (unsigned draft) — ${insp.inspection_date || "inspection"}`,
             url: insp.notification_pdf_url,
             uploaded_at: insp.created_at,
+            applicant: app?.profiles?.ac_name,
+            qualification: app?.qualifications?.name,
+          });
+        }
+        if (insp.signed_notification_pdf_url) {
+          all.push({
+            id: `notif-signed-${insp.id}`,
+            kind: "Pre-notification letter",
+            label: `Pre-inspection notification (signed) — ${insp.inspection_date || "inspection"}`,
+            url: insp.signed_notification_pdf_url,
+            uploaded_at: insp.updated_at || insp.created_at,
             applicant: app?.profiles?.ac_name,
             qualification: app?.qualifications?.name,
           });

@@ -64,10 +64,11 @@ spreadsheet changes and you want to reimport).
    documents and resubmit, which flips the status back to `pending`.
 3. **Inspection** — once approved, the admin sets an inspection date, time,
    and assigns an expert (a new row in `inspections`, `status =
-   'inspection_scheduled'`). This automatically generates a Pre-Inspection
+   'inspection_scheduled'`). This automatically generates a draft Pre-Inspection
    Letter of Notification (TESDA-OP-CO-03-F06, `src/lib/preNotificationPdf.js`)
-   as a PDF, uploads it, and notifies the client — viewable inline on both
-   sides via the PDF viewer.
+   as a PDF. The admin reviews this unsigned draft, prints and signs it, then
+   uploads the scanned signed copy — only the signed version is ever shown to
+   the client, and uploading it triggers their notification.
 4. **Compliance check** — after the visit, the admin uploads the signed
    inspection report and marks the inspection compliant or not.
    - **Non-compliant**: lackings are recorded on that `inspections` row: the
@@ -141,7 +142,8 @@ Notes on the migration:
      and [`supabase/005_app_settings.sql`](./supabase/005_app_settings.sql),
      then optionally [`supabase/006_import_legacy_centers.sql`](./supabase/006_import_legacy_centers.sql)
      if you want the historical 2025/2026 accredited-center records imported (see below),
-     then [`supabase/007_pre_notification.sql`](./supabase/007_pre_notification.sql),
+     then [`supabase/007_pre_notification.sql`](./supabase/007_pre_notification.sql)
+     and [`supabase/008_signed_pre_notification.sql`](./supabase/008_signed_pre_notification.sql),
      which additively add everything from the inspection cycle through
      certificate issuance without touching your existing data.
 3. In **Project Settings → API**, copy the **Project URL** and **anon public

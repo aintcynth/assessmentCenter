@@ -234,13 +234,13 @@ export default function ApplicationDetailPage() {
       uploaded_at: d.uploaded_at,
     })),
     ...inspections
-      .filter((insp) => insp.notification_pdf_url)
+      .filter((insp) => insp.signed_notification_pdf_url)
       .map((insp) => ({
         id: `notif-${insp.id}`,
         kind: "Pre-notification letter",
         label: `Pre-inspection notification — ${insp.inspection_date || "inspection"}`,
-        url: insp.notification_pdf_url,
-        uploaded_at: insp.created_at,
+        url: insp.signed_notification_pdf_url,
+        uploaded_at: insp.updated_at || insp.created_at,
       })),
     ...inspections
       .filter((insp) => insp.report_url)
@@ -345,12 +345,16 @@ export default function ApplicationDetailPage() {
                     at <span className="font-medium text-ink">{latestInspection.inspection_time}</span> with{" "}
                     <span className="font-medium text-ink">{latestInspection.expert_name}</span>.
                   </p>
-                  {latestInspection.notification_pdf_url && (
+                  {latestInspection.signed_notification_pdf_url ? (
                     <PdfViewer
-                      url={latestInspection.notification_pdf_url}
+                      url={latestInspection.signed_notification_pdf_url}
                       title="Pre-inspection notification letter"
                       height={340}
                     />
+                  ) : (
+                    <p className="text-sm text-ink/50">
+                      Your pre-inspection notification letter will appear here once it's been signed.
+                    </p>
                   )}
                   {latestInspection.compliant === false && (
                     <div className="rounded-seal border border-clay/30 bg-clay/10 px-4 py-3 text-sm text-clay">

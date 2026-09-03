@@ -38,6 +38,8 @@ export default function AdminApplicationDetailPage() {
   const [scheduledDate, setScheduledDate] = useState("");
   const [scheduledTime, setScheduledTime] = useState("");
   const [reportFile, setReportFile] = useState(null);
+  const [signedLetterFile, setSignedLetterFile] = useState(null);
+  const [signedLetterBusy, setSignedLetterBusy] = useState(false);
   const [lackings, setLackings] = useState("");
 
   const [issuanceDate, setIssuanceDate] = useState("");
@@ -231,7 +233,7 @@ export default function AdminApplicationDetailPage() {
         userId: app.user_id,
         applicationId: id,
         title: isReinspection ? "Reinspection scheduled" : "Inspection scheduled",
-        message: `Your pre-inspection notification letter is ready to view — inspection set for ${scheduledDate} at ${scheduledTime}.`,
+        message: `Your inspection has been scheduled for ${scheduledDate} at ${scheduledTime}. You'll be notified once your signed pre-inspection notification letter is ready.`,
       });
 
       await logActivity(supabase, {
@@ -250,6 +252,51 @@ export default function AdminApplicationDetailPage() {
       setError(err.message);
     } finally {
       setBusy(false);
+    }
+  }
+
+  // Admin uploads the physically signed pre-notification letter — the only
+  // version the client ever sees.
+  async function handleUploadSignedLetter(e) {
+    e.preventDefault();
+    if (!signedLetterFile || !inspections[0]) return;
+    setSignedLetterBusy(true);
+    setError("");
+    try {
+      const user = await currentAdmin();
+      const stored = `${user.id}/${id}/signed-pre-notification-${Date.now()}-${signedLetterFile.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from("accreditation-files")
+        .upload(stored, signedLetterFile);
+      if (uploadError) throw uploadError;
+      const signedUrl = supabase.storage.from("accreditation-files").getPublicUrl(stored).data.publicUrl;
+
+      const { error: updateError } = await supabase
+        .from("inspections")
+        .update({ signed_notification_pdf_url: signedUrl })
+        .eq("id", inspections[0].id);
+      if (updateError) throw updateError;
+
+      await notifyUser(supabase, {
+        userId: app.user_id,
+        applicationId: id,
+        title: "Pre-inspection notification letter ready",
+        message: "Your signed pre-inspection notification letter is ready to view.",
+      });
+
+      await logActivity(supabase, {
+        applicationId: id,
+        actorId: user.id,
+        actorName: profile?.ac_name,
+        action: "Signed pre-notification letter uploaded",
+      });
+
+      setSignedLetterFile(null);
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSignedLetterBusy(false);
     }
   }
 
@@ -636,9 +683,18 @@ export default function AdminApplicationDetailPage() {
       .map((insp) => ({
         id: `notif-${insp.id}`,
         kind: "Pre-notification letter",
-        label: `Pre-inspection notification — ${insp.inspection_date || "inspection"}`,
+        label: `Pre-inspection notification (unsigned draft) — ${insp.inspection_date || "inspection"}`,
         url: insp.notification_pdf_url,
         uploaded_at: insp.created_at,
+      })),
+    ...inspections
+      .filter((insp) => insp.signed_notification_pdf_url)
+      .map((insp) => ({
+        id: `notif-signed-${insp.id}`,
+        kind: "Pre-notification letter",
+        label: `Pre-inspection notification (signed) — ${insp.inspection_date || "inspection"}`,
+        url: insp.signed_notification_pdf_url,
+        uploaded_at: insp.updated_at || insp.created_at,
       })),
     ...inspections
       .filter((insp) => insp.report_url)
@@ -802,9 +858,41 @@ export default function AdminApplicationDetailPage() {
                 Inspected {latestInspection.inspection_date} {latestInspection.inspection_time} by{" "}
                 {latestInspection.expert_name}
               </p>
+
               {latestInspection.notification_pdf_url && (
-                <PdfViewer url={latestInspection.notification_pdf_url} title="Pre-inspection notification letter" height={340} />
+                <PdfViewer
+                  url={latestInspection.notification_pdf_url}
+                  title="Pre-inspection notification letter (unsigned draft)"
+                  height={340}
+                />
               )}
+
+              {latestInspection.signed_notification_pdf_url ? (
+                <PdfViewer
+                  url={latestInspection.signed_notification_pdf_url}
+                  title="Pre-inspection notification letter (signed)"
+                  height={340}
+                />
+              ) : (
+                <form onSubmit={handleUploadSignedLetter} className="rounded-seal border border-seal/10 p-4 space-y-3">
+                  <p className="text-sm font-medium text-ink">Upload signed pre-notification letter</p>
+                  <p className="text-xs text-ink/50">
+                    Print and sign the draft above, then upload the scanned copy. The client only sees this signed
+                    version.
+                  </p>
+                  <input
+                    type="file"
+                    accept="application/pdf,image/*"
+                    required
+                    className="input-field"
+                    onChange={(e) => setSignedLetterFile(e.target.files?.[0] || null)}
+                  />
+                  <button type="submit" disabled={signedLetterBusy || !signedLetterFile} className="btn-secondary">
+                    {signedLetterBusy ? "Uploading…" : "Upload signed letter"}
+                  </button>
+                </form>
+              )}
+
               <label className="label">Inspection report (optional)</label>
               <input
                 type="file"

@@ -387,9 +387,8 @@ export default function ApplicationDetailPage() {
                 Issued {app.issuance_date} · Expires {app.expiration_date}
               </p>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <PdfViewer url={app.cert_pdf_url} title="Certificate of Accreditation (draft)" height={360} />
-                <PdfViewer url={app.aou_pdf_url} title="AOU (template — print, sign, and upload below)" height={360} />
+              <div className="grid gap-4 sm:grid">
+                <PdfViewer url={app.aou_pdf_url} title="AOU (template — print, sign, and upload below)" height={600} />
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">

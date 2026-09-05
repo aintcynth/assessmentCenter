@@ -158,7 +158,7 @@ function ApplyWizard() {
       // Show success modal with action to go to dashboard
       showModal(
         "Application Submitted",
-        "Your accreditation application has been successfully submitted. You will receive updates via email.",
+        "Your accreditation application has been successfully submitted. Your application is under review.",
         "View Dashboard",
         () => router.push("/dashboard")
       );

@@ -28,7 +28,7 @@ export default function AdminDocumentsPage() {
 
       const { data: apps } = await supabase
         .from("assessment_applications")
-        .select("id, application_no, profiles:user_id(ac_name, email), qualifications:qualification_id(name, code)");
+        .select("id, profiles:user_id(ac_name, email), qualifications:qualification_id(name, code)");
 
       const appById = {};
       (apps || []).forEach((a) => (appById[a.id] = a));
@@ -56,6 +56,7 @@ export default function AdminDocumentsPage() {
         const app = appById[d.application_id];
         all.push({
           id: `doc-${d.id}`,
+          applicationId: d.application_id,
           kind: "Application document",
           label: `Req. ${d.requirement_index}: ${d.filename_original}`,
           url: d.file_url,
@@ -70,6 +71,7 @@ export default function AdminDocumentsPage() {
         if (insp.notification_pdf_url) {
           all.push({
             id: `notif-${insp.id}`,
+            applicationId: insp.application_id,
             kind: "Pre-notification letter",
             label: `Pre-inspection notification (unsigned draft) — ${insp.inspection_date || "inspection"}`,
             url: insp.notification_pdf_url,
@@ -81,6 +83,7 @@ export default function AdminDocumentsPage() {
         if (insp.signed_notification_pdf_url) {
           all.push({
             id: `notif-signed-${insp.id}`,
+            applicationId: insp.application_id,
             kind: "Pre-notification letter",
             label: `Pre-inspection notification (signed) — ${insp.inspection_date || "inspection"}`,
             url: insp.signed_notification_pdf_url,
@@ -92,6 +95,7 @@ export default function AdminDocumentsPage() {
         if (insp.post_notification_pdf_url) {
           all.push({
             id: `postnotif-${insp.id}`,
+            applicationId: insp.application_id,
             kind: "Post-notification letter",
             label: `Post-inspection notification (unsigned draft) — ${insp.inspection_date || "inspection"}`,
             url: insp.post_notification_pdf_url,
@@ -103,6 +107,7 @@ export default function AdminDocumentsPage() {
         if (insp.signed_post_notification_pdf_url) {
           all.push({
             id: `postnotif-signed-${insp.id}`,
+            applicationId: insp.application_id,
             kind: "Post-notification letter",
             label: `Post-inspection notification (signed) — ${insp.inspection_date || "inspection"}`,
             url: insp.signed_post_notification_pdf_url,
@@ -114,6 +119,7 @@ export default function AdminDocumentsPage() {
         if (insp.report_url) {
           all.push({
             id: `insp-${insp.id}`,
+            applicationId: insp.application_id,
             kind: "Inspection report",
             label: `Signed report — ${insp.inspection_date || "inspection"}`,
             url: insp.report_url,
@@ -129,6 +135,7 @@ export default function AdminDocumentsPage() {
         if (pay.receipt_url) {
           all.push({
             id: `receipt-${pay.id}`,
+            applicationId: pay.application_id,
             kind: "Receipt of payment",
             label: "Receipt of payment",
             url: pay.receipt_url,
@@ -140,6 +147,7 @@ export default function AdminDocumentsPage() {
         if (pay.aou_url) {
           all.push({
             id: `aou-${pay.id}`,
+            applicationId: pay.application_id,
             kind: "AOU",
             label: "AOU",
             url: pay.aou_url,
@@ -160,10 +168,27 @@ export default function AdminDocumentsPage() {
   const filtered = useMemo(() => {
     return files.filter((f) => {
       if (kindFilter !== "All types" && f.kind !== kindFilter) return false;
-      const haystack = `${f.applicant || ""} ${f.qualification || ""} ${f.label}`.toLowerCase();
+      const haystack = `${f.applicationId || ""} ${f.applicant || ""} ${f.qualification || ""} ${f.label}`.toLowerCase();
       return haystack.includes(search.toLowerCase());
     });
   }, [files, search, kindFilter]);
+
+  const applicationGroups = useMemo(() => {
+    const groups = new Map();
+    filtered.forEach((file) => {
+      const key = file.applicationId || file.id;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          applicationId: file.applicationId,
+          applicant: file.applicant,
+          qualification: file.qualification,
+          files: [],
+        });
+      }
+      groups.get(key).files.push(file);
+    });
+    return Array.from(groups.values());
+  }, [filtered]);
 
   return (
     <AdminShell acName={profile?.ac_name}>
@@ -172,7 +197,9 @@ export default function AdminDocumentsPage() {
           <p className="text-xs font-semibold uppercase tracking-wider text-brass">Documents</p>
           <h1 className="font-display text-3xl font-semibold text-seal">All uploaded documents</h1>
         </div>
-        <p className="text-sm text-ink/50">{filtered.length} file(s)</p>
+        <p className="text-sm text-ink/50">
+          {applicationGroups.length} application(s) · {filtered.length} file(s)
+        </p>
       </div>
 
       <div className="card">
@@ -192,42 +219,67 @@ export default function AdminDocumentsPage() {
           </select>
         </div>
 
-        {filtered.length === 0 ? (
+        {applicationGroups.length === 0 ? (
           <p className="text-sm text-ink/50">No documents match.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-sm">
-              <thead>
-                <tr className="border-b border-seal/10 text-left text-xs uppercase tracking-wider text-ink/50">
-                  <th className="pb-3 pr-4 font-medium">Type</th>
-                  <th className="pb-3 pr-4 font-medium">File</th>
-                  <th className="pb-3 pr-4 font-medium">Applicant</th>
-                  <th className="pb-3 pr-4 font-medium">Qualification</th>
-                  <th className="pb-3 pr-4 font-medium">Uploaded</th>
-                  <th className="pb-3 font-medium"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-seal/10">
-                {filtered.map((f) => (
-                  <tr key={f.id}>
-                    <td className="py-2.5 pr-4">
-                      <DocumentTypeTag kind={f.kind} />
-                    </td>
-                    <td className="py-2.5 pr-4 text-ink">{f.label}</td>
-                    <td className="py-2.5 pr-4 text-ink/70">{f.applicant || "—"}</td>
-                    <td className="py-2.5 pr-4 text-ink/70">{f.qualification || "—"}</td>
-                    <td className="py-2.5 pr-4 text-ink/50">
-                      {f.uploaded_at ? new Date(f.uploaded_at).toLocaleDateString() : "—"}
-                    </td>
-                    <td className="py-2.5 text-right">
-                      <a href={f.url} target="_blank" className="font-medium text-seal hover:text-brass">
-                        View →
-                      </a>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-6">
+            {applicationGroups.map((group) => (
+              <section
+                key={group.applicationId || group.files[0].id}
+                className="overflow-hidden rounded-seal border border-seal/10"
+              >
+                <div className="border-b border-seal/10 bg-seal/[0.03] px-4 py-3">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-brass">Application</p>
+                      <h2 className="font-display text-lg font-semibold text-seal">
+                        {group.applicationId ? `Application ${group.applicationId.slice(0, 8).toUpperCase()}` : "Application unavailable"}
+                      </h2>
+                    </div>
+                    <p className="text-sm text-ink/60">{group.files.length} file(s)</p>
+                  </div>
+                  <p className="mt-1 text-sm text-ink/70">
+                    {group.applicant || "Applicant unavailable"} · {group.qualification || "Qualification unavailable"}
+                  </p>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[680px] text-sm">
+                    <thead>
+                      <tr className="border-b border-seal/10 text-left text-xs uppercase tracking-wider text-ink/50">
+                        <th className="px-4 pb-3 pt-3 pr-4 font-medium">Type</th>
+                        <th className="pb-3 pr-4 font-medium">File</th>
+                        <th className="pb-3 pr-4 font-medium">Uploaded</th>
+                        <th className="pb-3 pr-4 font-medium"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-seal/10">
+                      {group.files.map((f) => (
+                        <tr key={f.id}>
+                          <td className="px-4 py-2.5 pr-4">
+                            <DocumentTypeTag kind={f.kind} />
+                          </td>
+                          <td className="py-2.5 pr-4 text-ink">{f.label}</td>
+                          <td className="py-2.5 pr-4 text-ink/50">
+                            {f.uploaded_at ? new Date(f.uploaded_at).toLocaleDateString() : "—"}
+                          </td>
+                          <td className="py-2.5 pr-4 text-right">
+                            <a
+                              href={f.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="font-medium text-seal hover:text-brass"
+                            >
+                              View →
+                            </a>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            ))}
           </div>
         )}
       </div>

@@ -79,13 +79,13 @@ export function generatePreNotificationPdf({
   y += 32;
 
   // Addressee block.
-  doc.setFont("helvetica", "bold");
+  doc.setFont("helvetica");
   doc.text(acManager || "—", margin, y);
   y += 14;
   doc.setFont("helvetica", "normal");
   doc.text("Assessment Center Manager", margin, y);
   y += 14;
-  doc.setFont("helvetica", "bold");
+  doc.setFont("helvetica");
   doc.text(centerName || "—", margin, y);
   y += 14;
   const addrLines = doc.splitTextToSize(address || "—", contentWidth);

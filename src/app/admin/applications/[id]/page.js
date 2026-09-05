@@ -15,6 +15,10 @@ import { loadImageAsPngDataUrl } from "@/lib/loadImage";
 import { generateCertNumber, previewCertNumber } from "@/lib/certNumber";
 import { generatePreNotificationPdf } from "@/lib/preNotificationPdf";
 import { generatePostNotificationPdf } from "@/lib/postNotificationPdf";
+import Modal from "@/components/Modal";
+import Toast from "@/components/Toast";
+import { useModal } from "@/lib/useModal";
+import { useToast } from "@/lib/useToast";
 
 // Client-only Supabase calls happen at render time, so skip static
 // prerendering (which runs at build time, before env vars may be wired up).
@@ -24,6 +28,8 @@ export default function AdminApplicationDetailPage() {
   const { id } = useParams();
   const router = useRouter();
   const supabase = createClient();
+  const { modal, showSuccess, showError, closeModal } = useModal();
+  const { toast, showSuccess: toastSuccess, showError: toastError, closeToast } = useToast();
 
   const [profile, setProfile] = useState(null);
   const [app, setApp] = useState(null);
@@ -32,7 +38,6 @@ export default function AdminApplicationDetailPage() {
   const [payment, setPayment] = useState(null);
   const [activity, setActivity] = useState([]);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
 
   const [reason, setReason] = useState("");
   const [inspectorName, setInspectorName] = useState("");
@@ -143,7 +148,6 @@ export default function AdminApplicationDetailPage() {
 
   async function handleApproveDocs() {
     setBusy(true);
-    setError("");
     try {
       const user = await currentAdmin();
       const { error: updateError } = await supabase
@@ -160,7 +164,7 @@ export default function AdminApplicationDetailPage() {
       });
       await load();
     } catch (err) {
-      setError(err.message);
+      toastError("Error", err.message);
     } finally {
       setBusy(false);
     }
@@ -168,18 +172,17 @@ export default function AdminApplicationDetailPage() {
 
   async function handleDeny() {
     if (!reason.trim()) {
-      setError("Add remarks so the applicant knows what's lacking.");
+      showError("Missing Remarks", "Add remarks so the applicant knows what's lacking.");
       return;
     }
     setBusy(true);
-    setError("");
     const user = await currentAdmin();
     const { error: updateError } = await supabase
       .from("assessment_applications")
       .update({ status: "denied", admin_reason: reason })
       .eq("id", id);
     if (updateError) {
-      setError(updateError.message);
+      toastError("Error", updateError.message);
       setBusy(false);
       return;
     }
@@ -197,7 +200,6 @@ export default function AdminApplicationDetailPage() {
   async function handleScheduleInspection(e) {
     e.preventDefault();
     setBusy(true);
-    setError("");
     try {
       const user = await currentAdmin();
       const isReinspection = inspections.length > 0;
@@ -252,7 +254,7 @@ export default function AdminApplicationDetailPage() {
       setScheduledTime("");
       await load();
     } catch (err) {
-      setError(err.message);
+      toastError("Error", err.message);
     } finally {
       setBusy(false);
     }
@@ -264,7 +266,6 @@ export default function AdminApplicationDetailPage() {
     e.preventDefault();
     if (!signedLetterFile || !inspections[0]) return;
     setSignedLetterBusy(true);
-    setError("");
     try {
       const user = await currentAdmin();
       const stored = `${user.id}/${id}/signed-pre-notification-${Date.now()}-${signedLetterFile.name}`;
@@ -297,7 +298,7 @@ export default function AdminApplicationDetailPage() {
       setSignedLetterFile(null);
       await load();
     } catch (err) {
-      setError(err.message);
+      toastError("Error", err.message);
     } finally {
       setSignedLetterBusy(false);
     }
@@ -307,7 +308,6 @@ export default function AdminApplicationDetailPage() {
     e.preventDefault();
     if (!postNotifFile || !inspections[0]) return;
     setPostNotifBusy(true);
-    setError("");
     try {
       const user = await currentAdmin();
       const stored = `${user.id}/${id}/signed-post-notification-${Date.now()}-${postNotifFile.name}`;
@@ -340,7 +340,7 @@ export default function AdminApplicationDetailPage() {
       setPostNotifFile(null);
       await load();
     } catch (err) {
-      setError(err.message);
+      toastError("Error", err.message);
     } finally {
       setPostNotifBusy(false);
     }
@@ -348,11 +348,10 @@ export default function AdminApplicationDetailPage() {
 
   async function handleMarkNonCompliant() {
     if (!lackings.trim()) {
-      setError("Describe what's lacking so the applicant knows what to fix.");
+      showError("Missing Lackings", "Describe what's lacking so the applicant knows what to fix.");
       return;
     }
     setBusy(true);
-    setError("");
     try {
       const user = await currentAdmin();
       let reportUrl = null;
@@ -402,7 +401,7 @@ export default function AdminApplicationDetailPage() {
       setReportFile(null);
       await load();
     } catch (err) {
-      setError(err.message);
+      toastError("Error", err.message);
     } finally {
       setBusy(false);
     }
@@ -410,7 +409,6 @@ export default function AdminApplicationDetailPage() {
 
   async function handleMarkCompliant() {
     setBusy(true);
-    setError("");
     try {
       const user = await currentAdmin();
       let reportUrl = null;
@@ -459,7 +457,7 @@ export default function AdminApplicationDetailPage() {
       setReportFile(null);
       await load();
     } catch (err) {
-      setError(err.message);
+      toastError("Error", err.message);
     } finally {
       setBusy(false);
     }
@@ -471,7 +469,6 @@ export default function AdminApplicationDetailPage() {
     e.preventDefault();
     if (!issuanceDate) return;
     setBusy(true);
-    setError("");
     try {
       const user = await currentAdmin();
       const issued = new Date(issuanceDate + "T00:00:00");
@@ -543,7 +540,7 @@ export default function AdminApplicationDetailPage() {
       setIssuanceDate("");
       await load();
     } catch (err) {
-      setError(err.message);
+      toastError("Error", err.message);
     } finally {
       setBusy(false);
     }
@@ -553,7 +550,6 @@ export default function AdminApplicationDetailPage() {
   // that payment + a signed AOU are needed next.
   async function handleNotifyClient() {
     setBusy(true);
-    setError("");
     try {
       const user = await currentAdmin();
       await notifyUser(supabase, {
@@ -579,7 +575,7 @@ export default function AdminApplicationDetailPage() {
 
       await load();
     } catch (err) {
-      setError(err.message);
+      toastError("Error", err.message);
     } finally {
       setBusy(false);
     }
@@ -589,7 +585,6 @@ export default function AdminApplicationDetailPage() {
   // independently of each other.
   async function handleAcknowledge(kind) {
     setBusy(true);
-    setError("");
     try {
       const user = await currentAdmin();
       const patch =
@@ -607,7 +602,7 @@ export default function AdminApplicationDetailPage() {
       });
       await load();
     } catch (err) {
-      setError(err.message);
+      toastError("Error", err.message);
     } finally {
       setBusy(false);
     }
@@ -615,11 +610,10 @@ export default function AdminApplicationDetailPage() {
 
   async function handleReject(kind) {
     if (!rejectReason.trim()) {
-      setError("Add a reason so the applicant knows what to fix.");
+      showError("Missing Reason", "Add a reason so the applicant knows what to fix.");
       return;
     }
     setBusy(true);
-    setError("");
     try {
       const user = await currentAdmin();
       const patch =
@@ -648,7 +642,7 @@ export default function AdminApplicationDetailPage() {
       setRejectReason("");
       await load();
     } catch (err) {
-      setError(err.message);
+      toastError("Error", err.message);
     } finally {
       setBusy(false);
     }
@@ -659,7 +653,6 @@ export default function AdminApplicationDetailPage() {
     e.preventDefault();
     if (!signedCertFile) return;
     setBusy(true);
-    setError("");
     try {
       const user = await currentAdmin();
       const stored = `${user.id}/${id}/signed-certificate-${Date.now()}-${signedCertFile.name}`;
@@ -683,7 +676,7 @@ export default function AdminApplicationDetailPage() {
       setSignedCertFile(null);
       await load();
     } catch (err) {
-      setError(err.message);
+      toastError("Error", err.message);
     } finally {
       setBusy(false);
     }
@@ -691,7 +684,6 @@ export default function AdminApplicationDetailPage() {
 
   async function handleReleaseCertificate() {
     setBusy(true);
-    setError("");
     try {
       const user = await currentAdmin();
 
@@ -730,7 +722,7 @@ export default function AdminApplicationDetailPage() {
 
       await load();
     } catch (err) {
-      setError(err.message);
+      toastError("Error", err.message);
     } finally {
       setBusy(false);
     }
@@ -893,10 +885,6 @@ export default function AdminApplicationDetailPage() {
         </div>
         <StatusPill status={app.status} />
       </div>
-
-      {error && (
-        <div className="mb-6 rounded-seal border border-clay/30 bg-clay/10 px-4 py-3 text-sm text-clay">{error}</div>
-      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
@@ -1395,6 +1383,24 @@ export default function AdminApplicationDetailPage() {
           </div>
         </div>
       </div>
+
+      <Modal
+        isOpen={modal.isOpen}
+        type={modal.type}
+        title={modal.title}
+        message={modal.message}
+        actionLabel={modal.actionLabel}
+        onAction={modal.onAction}
+        onClose={closeModal}
+      />
+
+      <Toast
+        isOpen={toast.isOpen}
+        type={toast.type}
+        message={toast.message}
+        onClose={closeToast}
+        duration={toast.duration}
+      />
     </AdminShell>
   );
 }

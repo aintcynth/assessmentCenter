@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import AdminShell from "@/components/AdminShell";
+import Toast from "@/components/Toast";
+import { useToast } from "@/lib/useToast";
 
 // Client-only Supabase calls happen at render time, so skip static
 // prerendering (which runs at build time, before env vars may be wired up).
@@ -10,6 +12,8 @@ export const dynamic = "force-dynamic";
 
 export default function AdminUsersPage() {
   const supabase = createClient();
+  const { toast, showSuccess: toastSuccess, showError: toastError, closeToast } = useToast();
+  
   const [profile, setProfile] = useState(null);
   const [users, setUsers] = useState([]);
   const [busyId, setBusyId] = useState(null);
@@ -33,9 +37,16 @@ export default function AdminUsersPage() {
   async function toggleRole(userRow) {
     setBusyId(userRow.id);
     const nextRole = userRow.role === "admin" ? "user" : "admin";
-    await supabase.from("profiles").update({ role: nextRole }).eq("id", userRow.id);
-    await load();
-    setBusyId(null);
+    try {
+      const { error } = await supabase.from("profiles").update({ role: nextRole }).eq("id", userRow.id);
+      if (error) throw error;
+      await load();
+      toastSuccess(`Role changed to ${nextRole}`);
+    } catch (err) {
+      toastError(err.message || "Failed to change role");
+    } finally {
+      setBusyId(null);
+    }
   }
 
   return (
@@ -92,6 +103,14 @@ export default function AdminUsersPage() {
           </table>
         )}
       </div>
+
+      <Toast
+        isOpen={toast.isOpen}
+        type={toast.type}
+        message={toast.message}
+        onClose={closeToast}
+        duration={toast.duration}
+      />
     </AdminShell>
   );
 }

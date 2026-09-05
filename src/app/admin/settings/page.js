@@ -3,6 +3,10 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import AdminShell from "@/components/AdminShell";
+import Modal from "@/components/Modal";
+import Toast from "@/components/Toast";
+import { useModal } from "@/lib/useModal";
+import { useToast } from "@/lib/useToast";
 
 // Client-only Supabase calls happen at render time, so skip static
 // prerendering (which runs at build time, before env vars may be wired up).
@@ -10,12 +14,13 @@ export const dynamic = "force-dynamic";
 
 export default function AdminSettingsPage() {
   const supabase = createClient();
+  const { modal, showSuccess, showError, closeModal } = useModal();
+  const { toast, showSuccess: toastSuccess, showError: toastError, closeToast } = useToast();
+  
   const [profile, setProfile] = useState(null);
   const [logoUrl, setLogoUrl] = useState(null);
   const [file, setFile] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [saved, setSaved] = useState(false);
 
   async function load() {
     const {
@@ -37,8 +42,6 @@ export default function AdminSettingsPage() {
     e.preventDefault();
     if (!file) return;
     setBusy(true);
-    setError("");
-    setSaved(false);
     try {
       const stored = `branding/logo-${Date.now()}-${file.name}`;
       const { error: uploadError } = await supabase.storage.from("accreditation-files").upload(stored, file);
@@ -52,9 +55,9 @@ export default function AdminSettingsPage() {
 
       setLogoUrl(publicUrl);
       setFile(null);
-      setSaved(true);
+      toastSuccess("Logo uploaded successfully");
     } catch (err) {
-      setError(err.message);
+      showError("Upload Failed", err.message || "Failed to upload logo", "Retry");
     } finally {
       setBusy(false);
     }
@@ -62,16 +65,15 @@ export default function AdminSettingsPage() {
 
   async function handleRemove() {
     setBusy(true);
-    setError("");
-    setSaved(false);
     try {
       const { error: upsertError } = await supabase
         .from("app_settings")
         .upsert({ id: 1, logo_url: null, updated_at: new Date().toISOString() });
       if (upsertError) throw upsertError;
       setLogoUrl(null);
+      toastSuccess("Logo removed successfully");
     } catch (err) {
-      setError(err.message);
+      toastError(err.message || "Failed to remove logo");
     } finally {
       setBusy(false);
     }
@@ -115,13 +117,28 @@ export default function AdminSettingsPage() {
               onChange={(e) => setFile(e.target.files?.[0] || null)}
             />
           </div>
-          {error && <p className="text-sm text-clay">{error}</p>}
-          {saved && <p className="text-sm text-moss">Logo saved.</p>}
           <button type="submit" disabled={busy || !file} className="btn-primary">
             {busy ? "Saving…" : "Save logo"}
           </button>
         </form>
       </div>
+
+      <Modal
+        isOpen={modal.isOpen}
+        type={modal.type}
+        title={modal.title}
+        message={modal.message}
+        actionLabel={modal.actionLabel}
+        onClose={closeModal}
+      />
+
+      <Toast
+        isOpen={toast.isOpen}
+        type={toast.type}
+        message={toast.message}
+        onClose={closeToast}
+        duration={toast.duration}
+      />
     </AdminShell>
   );
 }

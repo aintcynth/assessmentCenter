@@ -4,23 +4,24 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import Modal from "@/components/Modal";
+import { useModal } from "@/lib/useModal";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { modal, showError: showModal, closeModal } = useModal();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setError("");
     setLoading(true);
     const supabase = createClient();
     const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
     if (signInError) {
-      setError(signInError.message);
+      showModal("Login Failed", signInError.message, "Try Again");
       return;
     }
     router.push("/dashboard");
@@ -60,7 +61,6 @@ export default function LoginPage() {
               placeholder="••••••••"
             />
           </div>
-          {error && <p className="text-sm text-clay">{error}</p>}
           <button type="submit" disabled={loading} className="btn-primary w-full">
             {loading ? "Logging in…" : "Log in"}
           </button>
@@ -75,6 +75,15 @@ export default function LoginPage() {
           Administrator? <Link href="/admin/login" className="underline hover:text-seal">Go to admin login</Link>
         </p>
       </div>
+
+      <Modal
+        isOpen={modal.isOpen}
+        type={modal.type}
+        title={modal.title}
+        message={modal.message}
+        actionLabel={modal.actionLabel}
+        onClose={closeModal}
+      />
     </div>
   );
 }

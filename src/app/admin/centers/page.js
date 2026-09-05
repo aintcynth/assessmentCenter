@@ -4,6 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import AdminShell from "@/components/AdminShell";
 import StatusPill from "@/components/StatusPill";
+import Modal from "@/components/Modal";
+import Toast from "@/components/Toast";
+import { useModal } from "@/lib/useModal";
+import { useToast } from "@/lib/useToast";
 
 // Client-only Supabase calls happen at render time, so skip static
 // prerendering (which runs at build time, before env vars may be wired up).
@@ -11,6 +15,9 @@ export const dynamic = "force-dynamic";
 
 export default function AdminCentersPage() {
   const supabase = createClient();
+  const { modal, showSuccess, showError, closeModal } = useModal();
+  const { toast, showSuccess: toastSuccess, showError: toastError, closeToast } = useToast();
+  
   const [profile, setProfile] = useState(null);
   const [centers, setCenters] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
@@ -24,7 +31,6 @@ export default function AdminCentersPage() {
   const [linkTargetUserId, setLinkTargetUserId] = useState("");
   const [linkAllSameName, setLinkAllSameName] = useState(true);
   const [linkBusy, setLinkBusy] = useState(false);
-  const [linkError, setLinkError] = useState("");
 
   async function load() {
     const {
@@ -55,9 +61,16 @@ export default function AdminCentersPage() {
   async function toggleStatus(center) {
     setBusyId(center.id);
     const next = center.status === "active" ? "inactive" : "active";
-    await supabase.from("assessment_centers").update({ status: next }).eq("id", center.id);
-    await load();
-    setBusyId(null);
+    try {
+      const { error } = await supabase.from("assessment_centers").update({ status: next }).eq("id", center.id);
+      if (error) throw error;
+      await load();
+      toastSuccess(`Center marked as ${next}`);
+    } catch (err) {
+      toastError(err.message || "Failed to update center status");
+    } finally {
+      setBusyId(null);
+    }
   }
 
   function openLinkPanel(center) {
@@ -75,11 +88,10 @@ export default function AdminCentersPage() {
 
   async function handleLink() {
     if (!linkTargetUserId) {
-      setLinkError("Pick a user to link this center to.");
+      showError("Select User", "Pick a user to link this center to.", "OK");
       return;
     }
     setLinkBusy(true);
-    setLinkError("");
     try {
       let query = supabase.from("assessment_centers").update({ user_id: linkTargetUserId });
       if (linkAllSameName) {
@@ -91,8 +103,9 @@ export default function AdminCentersPage() {
       if (error) throw error;
       setLinkingCenter(null);
       await load();
+      toastSuccess(`Center linked successfully`);
     } catch (err) {
-      setLinkError(err.message);
+      showError("Link Failed", err.message || "Failed to link center", "Retry");
     } finally {
       setLinkBusy(false);
     }
@@ -100,9 +113,16 @@ export default function AdminCentersPage() {
 
   async function handleUnlink(center) {
     setBusyId(center.id);
-    await supabase.from("assessment_centers").update({ user_id: null }).eq("id", center.id);
-    await load();
-    setBusyId(null);
+    try {
+      const { error } = await supabase.from("assessment_centers").update({ user_id: null }).eq("id", center.id);
+      if (error) throw error;
+      await load();
+      toastSuccess("Center unlinked successfully");
+    } catch (err) {
+      toastError(err.message || "Failed to unlink center");
+    } finally {
+      setBusyId(null);
+    }
   }
 
   const filtered = useMemo(() => {
@@ -189,8 +209,6 @@ export default function AdminCentersPage() {
               this one
             </label>
           )}
-
-          {linkError && <p className="text-sm text-clay">{linkError}</p>}
 
           <div className="flex gap-3">
             <button disabled={linkBusy} onClick={handleLink} className="btn-primary">
@@ -284,6 +302,23 @@ export default function AdminCentersPage() {
           </table>
         )}
       </div>
+
+      <Modal
+        isOpen={modal.isOpen}
+        type={modal.type}
+        title={modal.title}
+        message={modal.message}
+        actionLabel={modal.actionLabel}
+        onClose={closeModal}
+      />
+
+      <Toast
+        isOpen={toast.isOpen}
+        type={toast.type}
+        message={toast.message}
+        onClose={closeToast}
+        duration={toast.duration}
+      />
     </AdminShell>
   );
 }

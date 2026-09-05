@@ -3,6 +3,10 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import AdminShell from "@/components/AdminShell";
+import Modal from "@/components/Modal";
+import Toast from "@/components/Toast";
+import { useModal } from "@/lib/useModal";
+import { useToast } from "@/lib/useToast";
 
 // Client-only Supabase calls happen at render time, so skip static
 // prerendering (which runs at build time, before env vars may be wired up).
@@ -10,12 +14,14 @@ export const dynamic = "force-dynamic";
 
 export default function AdminQualificationPage() {
   const supabase = createClient();
+  const { modal, showSuccess, showError, closeModal } = useModal();
+  const { toast, showSuccess: toastSuccess, closeToast } = useToast();
+  
   const [profile, setProfile] = useState(null);
   const [qualifications, setQualifications] = useState([]);
   const [search, setSearch] = useState("");
   const [form, setForm] = useState({ name: "", description: "", level: "", code: "" });
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
 
   async function load() {
     const {
@@ -36,16 +42,18 @@ export default function AdminQualificationPage() {
   async function handleAdd(e) {
     e.preventDefault();
     setSaving(true);
-    setError("");
-    const nextId = qualifications.length ? Math.max(...qualifications.map((q) => q.id)) + 1 : 1;
-    const { error: insertError } = await supabase.from("qualifications").insert({ id: nextId, ...form });
-    setSaving(false);
-    if (insertError) {
-      setError(insertError.message);
-      return;
+    try {
+      const nextId = qualifications.length ? Math.max(...qualifications.map((q) => q.id)) + 1 : 1;
+      const { error: insertError } = await supabase.from("qualifications").insert({ id: nextId, ...form });
+      if (insertError) throw insertError;
+      setForm({ name: "", description: "", level: "", code: "" });
+      await load();
+      toastSuccess(`${form.name} added successfully`);
+    } catch (err) {
+      showError("Failed to Add", err.message || "Could not add qualification", "Try Again");
+    } finally {
+      setSaving(false);
     }
-    setForm({ name: "", description: "", level: "", code: "" });
-    await load();
   }
 
   const filtered = qualifications.filter((q) =>
@@ -77,7 +85,7 @@ export default function AdminQualificationPage() {
           <label className="label">Level</label>
           <input required className="input-field" value={form.level} onChange={(e) => setForm({ ...form, level: e.target.value })} placeholder="e.g. II" />
         </div>
-        {error && <p className="text-sm text-clay sm:col-span-2">{error}</p>}
+
         <div className="sm:col-span-2 flex justify-end">
           <button type="submit" disabled={saving} className="btn-primary">
             {saving ? "Adding…" : "Add qualification"}
@@ -116,6 +124,23 @@ export default function AdminQualificationPage() {
           </table>
         </div>
       </div>
+
+      <Modal
+        isOpen={modal.isOpen}
+        type={modal.type}
+        title={modal.title}
+        message={modal.message}
+        actionLabel={modal.actionLabel}
+        onClose={closeModal}
+      />
+
+      <Toast
+        isOpen={toast.isOpen}
+        type={toast.type}
+        message={toast.message}
+        onClose={closeToast}
+        duration={toast.duration}
+      />
     </AdminShell>
   );
 }

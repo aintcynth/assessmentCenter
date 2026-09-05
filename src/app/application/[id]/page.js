@@ -9,6 +9,10 @@ import StatusPill from "@/components/StatusPill";
 import Trailsheet from "@/components/Trailsheet";
 import DocumentTypeTag from "@/components/DocumentTypeTag";
 import PdfViewer from "@/components/PdfViewer";
+import Modal from "@/components/Modal";
+import Toast from "@/components/Toast";
+import { useModal } from "@/lib/useModal";
+import { useToast } from "@/lib/useToast";
 
 // Client-only Supabase calls happen at render time, so skip static
 // prerendering (which runs at build time, before env vars may be wired up).
@@ -18,6 +22,8 @@ export default function ApplicationDetailPage() {
   const { id } = useParams();
   const router = useRouter();
   const supabase = createClient();
+  const { modal, showSuccess, showError, closeModal } = useModal();
+  const { toast, showSuccess: toastSuccess, showError: toastError, closeToast } = useToast();
 
   const [profile, setProfile] = useState(null);
   const [app, setApp] = useState(null);
@@ -27,7 +33,6 @@ export default function ApplicationDetailPage() {
   const [center, setCenter] = useState(null);
   const [activity, setActivity] = useState([]);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
 
   // Edit & resubmit (denied applications)
   const [newDocLabel, setNewDocLabel] = useState("");
@@ -97,7 +102,6 @@ export default function ApplicationDetailPage() {
     e.preventDefault();
     if (!newDocFile) return;
     setBusy(true);
-    setError("");
     try {
       const {
         data: { user },
@@ -131,8 +135,9 @@ export default function ApplicationDetailPage() {
       setNewDocFile(null);
       e.target.reset();
       await load();
+      toastSuccess("Document uploaded successfully");
     } catch (err) {
-      setError(err.message);
+      toastError(err.message || "Failed to upload document");
     } finally {
       setBusy(false);
     }
@@ -140,7 +145,6 @@ export default function ApplicationDetailPage() {
 
   async function handleResubmit() {
     setBusy(true);
-    setError("");
     try {
       const {
         data: { user },
@@ -158,8 +162,9 @@ export default function ApplicationDetailPage() {
         action: "Application resubmitted",
       });
       await load();
+      toastSuccess("Application resubmitted successfully");
     } catch (err) {
-      setError(err.message);
+      toastError(err.message || "Failed to resubmit application");
     } finally {
       setBusy(false);
     }
@@ -167,7 +172,6 @@ export default function ApplicationDetailPage() {
 
   async function uploadPaymentFile(file, kind) {
     setBusy(true);
-    setError("");
     try {
       const {
         data: { user },
@@ -207,8 +211,9 @@ export default function ApplicationDetailPage() {
       if (kind === "receipt") setReceiptFile(null);
       else setAouFile(null);
       await load();
+      toastSuccess(`${kind === "receipt" ? "Receipt" : "AOU"} uploaded successfully`);
     } catch (err) {
-      setError(err.message);
+      toastError(err.message || "Failed to upload file");
     } finally {
       setBusy(false);
     }
@@ -299,10 +304,6 @@ export default function ApplicationDetailPage() {
         </div>
         <StatusPill status={app.status} />
       </div>
-
-      {error && (
-        <div className="mb-6 rounded-seal border border-clay/30 bg-clay/10 px-4 py-3 text-sm text-clay">{error}</div>
-      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
@@ -543,6 +544,24 @@ export default function ApplicationDetailPage() {
           <Trailsheet entries={activity} />
         </div>
       </div>
+
+      <Modal
+        isOpen={modal.isOpen}
+        type={modal.type}
+        title={modal.title}
+        message={modal.message}
+        actionLabel={modal.actionLabel}
+        onAction={modal.onAction}
+        onClose={closeModal}
+      />
+
+      <Toast
+        isOpen={toast.isOpen}
+        type={toast.type}
+        message={toast.message}
+        onClose={closeToast}
+        duration={toast.duration}
+      />
     </ClientShell>
   );
 }

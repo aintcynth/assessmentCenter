@@ -4,9 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import Modal from "@/components/Modal";
+import { useModal } from "@/lib/useModal";
 
 export default function SignupPage() {
   const router = useRouter();
+  const { modal, showError: showErrorModal, showInfo: showInfoModal, closeModal } = useModal();
   const [acName, setAcName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -14,14 +17,10 @@ export default function SignupPage() {
   const [acManager, setAcManager] = useState("");
   const [acType, setAcType] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setError("");
-    setNotice("");
     setLoading(true);
     const supabase = createClient();
     const { data, error: signUpError } = await supabase.auth.signUp({
@@ -31,14 +30,14 @@ export default function SignupPage() {
     });
     setLoading(false);
     if (signUpError) {
-      setError(signUpError.message);
+      showErrorModal("Signup Failed", signUpError.message, "Try Again");
       return;
     }
     if (data.session) {
       router.push("/dashboard");
       router.refresh();
     } else {
-      setNotice("Check your inbox to confirm your email, then log in.");
+      showInfoModal("Verify Your Email", "Check your inbox to confirm your email, then log in.", "Got it");
     }
   }
 
@@ -133,8 +132,6 @@ export default function SignupPage() {
               placeholder="At least 6 characters"
             />
           </div>
-          {error && <p className="text-sm text-clay">{error}</p>}
-          {notice && <p className="text-sm text-moss">{notice}</p>}
           <button type="submit" disabled={loading} className="btn-primary w-full">
             {loading ? "Creating account…" : "Sign up"}
           </button>
@@ -146,6 +143,15 @@ export default function SignupPage() {
           </Link>
         </p>
       </div>
+
+      <Modal
+        isOpen={modal.isOpen}
+        type={modal.type}
+        title={modal.title}
+        message={modal.message}
+        actionLabel={modal.actionLabel}
+        onClose={closeModal}
+      />
     </div>
   );
 }

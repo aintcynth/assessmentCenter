@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import ClientShell from "@/components/ClientShell";
+import Toast from "@/components/Toast";
+import { useToast } from "@/lib/useToast";
 
 // Client-only Supabase calls happen at render time, so skip static
 // prerendering (which runs at build time, before env vars may be wired up).
@@ -10,10 +12,10 @@ export const dynamic = "force-dynamic";
 
 export default function ProfilePage() {
   const supabase = createClient();
+  const { toast, showSuccess, showError, closeToast } = useToast();
   const [profile, setProfile] = useState(null);
   const [form, setForm] = useState({ ac_name: "", phone: "", address: "", ac_manager: "", ac_type: "" });
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -38,10 +40,15 @@ export default function ProfilePage() {
   async function handleSubmit(e) {
     e.preventDefault();
     setSaving(true);
-    setSaved(false);
-    await supabase.from("profiles").update(form).eq("id", profile.id);
-    setSaving(false);
-    setSaved(true);
+    try {
+      const { error } = await supabase.from("profiles").update(form).eq("id", profile.id);
+      if (error) throw error;
+      showSuccess("Profile updated successfully");
+    } catch (err) {
+      showError(err.message || "Failed to update profile");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -104,13 +111,20 @@ export default function ProfilePage() {
             </select>
           </div>
         </div>
-        {saved && <p className="text-sm text-moss">Profile updated.</p>}
         <div className="flex justify-end">
           <button type="submit" disabled={saving} className="btn-primary">
             {saving ? "Saving…" : "Save changes"}
           </button>
         </div>
       </form>
+
+      <Toast
+        isOpen={toast.isOpen}
+        type={toast.type}
+        message={toast.message}
+        onClose={closeToast}
+        duration={toast.duration}
+      />
     </ClientShell>
   );
 }

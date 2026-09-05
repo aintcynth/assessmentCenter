@@ -5,6 +5,11 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { logActivity } from "@/lib/activity";
 import ClientShell from "@/components/ClientShell";
+import Modal from "@/components/Modal";
+import Toast from "@/components/Toast";
+import { LoadingSpinner, FullPageLoader } from "@/components/LoadingSpinner";
+import { useModal } from "@/lib/useModal";
+import { useToast } from "@/lib/useToast";
 
 // Client-only Supabase calls happen at render time, so skip static
 // prerendering (which runs at build time, before env vars may be wired up).
@@ -24,6 +29,9 @@ function ApplyWizard() {
   const router = useRouter();
   const supabase = createClient();
 
+  const { modal, showSuccess: showModal, showError: showModalError, closeModal } = useModal();
+  const { toast, showSuccess: toastSuccess, showError: toastError, closeToast } = useToast();
+
   const [profile, setProfile] = useState(null);
   const [step, setStep] = useState(0);
   const [qualifications, setQualifications] = useState([]);
@@ -31,7 +39,6 @@ function ApplyWizard() {
   const [qualificationId, setQualificationId] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
 
   // Staged documents: uploaded to storage immediately, persisted to the DB
   // only once the application itself is created on final submit.
@@ -76,7 +83,6 @@ function ApplyWizard() {
     e.preventDefault();
     if (!docFile) return;
     setUploading(true);
-    setError("");
     try {
       const {
         data: { user },
@@ -101,8 +107,9 @@ function ApplyWizard() {
       setDocLabel("");
       setDocFile(null);
       e.target.reset();
+      toastSuccess("Document uploaded successfully");
     } catch (err) {
-      setError(err.message);
+      toastError(err.message || "Failed to upload document");
     } finally {
       setUploading(false);
     }
@@ -114,7 +121,6 @@ function ApplyWizard() {
 
   async function handleFinalSubmit() {
     setSaving(true);
-    setError("");
     try {
       const {
         data: { user },
@@ -149,9 +155,20 @@ function ApplyWizard() {
         notes: `${selectedQualification?.name || "Qualification"} · ${stagedDocs.length} document(s) attached`,
       });
 
-      router.push("/dashboard");
+      // Show success modal with action to go to dashboard
+      showModal(
+        "Application Submitted",
+        "Your accreditation application has been successfully submitted. You will receive updates via email.",
+        "View Dashboard",
+        () => router.push("/dashboard")
+      );
     } catch (err) {
-      setError(err.message);
+      showModalError(
+        "Submission Failed",
+        err.message || "Unable to submit application. Please try again.",
+        "Retry",
+        handleFinalSubmit
+      );
     } finally {
       setSaving(false);
     }
@@ -165,7 +182,7 @@ function ApplyWizard() {
   if (loading) {
     return (
       <ClientShell acName={profile?.email}>
-        <p className="text-sm text-ink/50">Loading…</p>
+        <FullPageLoader message="Loading your application..." />
       </ClientShell>
     );
   }
@@ -193,12 +210,6 @@ function ApplyWizard() {
           </li>
         ))}
       </ol>
-
-      {error && (
-        <div className="mb-6 rounded-seal border border-clay/30 bg-clay/10 px-4 py-3 text-sm text-clay">
-          {error}
-        </div>
-      )}
 
       {step === 0 && (
         <div className="card">
@@ -284,7 +295,11 @@ function ApplyWizard() {
               onChange={(e) => setDocFile(e.target.files?.[0] || null)}
             />
             <button type="submit" disabled={uploading} className="btn-secondary">
-              {uploading ? "Uploading…" : "Add document"}
+              {uploading ? (
+                <LoadingSpinner size="sm" message={null} />
+              ) : (
+                "Add document"
+              )}
             </button>
           </form>
 
@@ -344,11 +359,38 @@ function ApplyWizard() {
               Back to documents
             </button>
             <button className="btn-primary" disabled={saving} onClick={handleFinalSubmit}>
-              {saving ? "Submitting…" : "Submit application"}
+              {saving ? (
+                <span className="flex items-center gap-2">
+                  <LoadingSpinner size="sm" message={null} />
+                  Submitting…
+                </span>
+              ) : (
+                "Submit application"
+              )}
             </button>
           </div>
         </div>
       )}
+
+      {/* Modal for success/error messages */}
+      <Modal
+        isOpen={modal.isOpen}
+        type={modal.type}
+        title={modal.title}
+        message={modal.message}
+        actionLabel={modal.actionLabel}
+        onAction={modal.onAction}
+        onClose={closeModal}
+      />
+
+      {/* Toast for quick notifications */}
+      <Toast
+        isOpen={toast.isOpen}
+        type={toast.type}
+        message={toast.message}
+        onClose={closeToast}
+        duration={toast.duration}
+      />
     </ClientShell>
   );
 }

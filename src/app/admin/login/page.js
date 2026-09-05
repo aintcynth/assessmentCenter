@@ -4,29 +4,30 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import Modal from "@/components/Modal";
+import { useModal } from "@/lib/useModal";
 
 export default function AdminLoginPage() {
   const router = useRouter();
+  const { modal, showError: showModal, closeModal } = useModal();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setError("");
     setLoading(true);
     const supabase = createClient();
     const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
     if (signInError) {
       setLoading(false);
-      setError(signInError.message);
+      showModal("Login Failed", signInError.message, "Try Again");
       return;
     }
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).single();
     setLoading(false);
     if (profile?.role !== "admin") {
-      setError("This account doesn't have administrator access.");
+      showModal("Access Denied", "This account doesn't have administrator access.", "OK");
       await supabase.auth.signOut();
       return;
     }
@@ -65,7 +66,6 @@ export default function AdminLoginPage() {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
-          {error && <p className="text-sm text-clay">{error}</p>}
           <button type="submit" disabled={loading} className="btn-primary w-full">
             {loading ? "Logging in…" : "Log in"}
           </button>
@@ -74,6 +74,15 @@ export default function AdminLoginPage() {
           Applicant? <Link href="/login" className="underline hover:text-parchment">Go to applicant login</Link>
         </p>
       </div>
+
+      <Modal
+        isOpen={modal.isOpen}
+        type={modal.type}
+        title={modal.title}
+        message={modal.message}
+        actionLabel={modal.actionLabel}
+        onClose={closeModal}
+      />
     </div>
   );
 }

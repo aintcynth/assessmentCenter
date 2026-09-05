@@ -69,32 +69,30 @@ spreadsheet changes and you want to reimport).
    as a PDF. The admin reviews this unsigned draft, prints and signs it, then
    uploads the scanned signed copy — only the signed version is ever shown to
    the client, and uploading it triggers their notification.
-4. **Compliance check** — after the visit, the admin uploads the signed
-   inspection report and marks the inspection compliant or not.
-   - **Non-compliant**: lackings are recorded on that `inspections` row: the
-     client sees them, and the admin schedules a **reinspection** (a new
-     `inspections` row) — this can repeat as many times as needed.
-   - **Compliant**: a certificate number is reserved on the application
-     (`cert_number`) and the status moves to `awaiting_payment`.
-5. **Compliance check** — after the visit, the admin uploads the signed
-   inspection report and marks the inspection compliant or not.
+4. **Compliance check** — the admin can only record the inspection report
+   and compliance decision on or after the scheduled inspection date. Marking
+   compliant or non-compliant automatically generates a draft Post-Inspection
+   Letter of Notification (TESDA-OP-CO-03-F09, `src/lib/postNotificationPdf.js`),
+   branching on the outcome (lacking items listed vs. cleared for processing);
+   same draft-then-signed pattern as the pre-inspection letter — the client
+   only ever sees the signed version.
    - **Non-compliant**: lackings are recorded on that `inspections` row: the
      client sees them, and the admin schedules a **reinspection** (a new
      `inspections` row) — this can repeat as many times as needed.
    - **Compliant**: a certificate number is reserved on the application
      (`cert_number`) and the status moves to `certificate_processing`.
-6. **Issuance & document generation** — the admin sets an issuance date
+5. **Issuance & document generation** — the admin sets an issuance date
    (expiry auto-computes as +2 years); the app generates a draft
    Certificate of Accreditation and a blank AOU template as PDFs
    (`jspdf`, entirely client-side) and uploads both to storage.
-7. **Review & notify** — the admin reviews both PDFs in an inline viewer,
+6. **Review & notify** — the admin reviews both PDFs in an inline viewer,
    then notifies the client (an in-app notification, plus `notified_at` on
    the application).
-8. **Payment / AOU upload & review** — the client uploads a receipt of
+7. **Payment / AOU upload & review** — the client uploads a receipt of
    payment and a signed AOU. The admin acknowledges or rejects each
    independently; a rejection requires a reason, notifies the client, and
    resets that document to `pending` so the client can re-upload.
-9. **Signed certificate & release** — once both documents are acknowledged,
+8. **Signed certificate & release** — once both documents are acknowledged,
    the admin uploads the physically signed certificate, reviews it in the
    PDF viewer, and releases it: this creates the `assessment_centers` row
    (using the signed certificate as `cert_url`) and flips the application to
@@ -143,7 +141,8 @@ Notes on the migration:
      then optionally [`supabase/006_import_legacy_centers.sql`](./supabase/006_import_legacy_centers.sql)
      if you want the historical 2025/2026 accredited-center records imported (see below),
      then [`supabase/007_pre_notification.sql`](./supabase/007_pre_notification.sql)
-     and [`supabase/008_signed_pre_notification.sql`](./supabase/008_signed_pre_notification.sql),
+     and [`supabase/008_signed_pre_notification.sql`](./supabase/008_signed_pre_notification.sql)
+     and [`supabase/009_post_notification.sql`](./supabase/009_post_notification.sql),
      which additively add everything from the inspection cycle through
      certificate issuance without touching your existing data.
 3. In **Project Settings → API**, copy the **Project URL** and **anon public

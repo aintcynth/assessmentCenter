@@ -46,7 +46,9 @@ export default function DocumentsPage() {
             .from("inspections")
             .select("*")
             .in("application_id", appIds)
-            .or("report_url.not.is.null,notification_pdf_url.not.is.null,signed_notification_pdf_url.not.is.null")
+            .or(
+              "report_url.not.is.null,notification_pdf_url.not.is.null,signed_notification_pdf_url.not.is.null,post_notification_pdf_url.not.is.null,signed_post_notification_pdf_url.not.is.null"
+            )
             .order("created_at", { ascending: false }),
           supabase.from("payment_submissions").select("*").in("application_id", appIds),
         ]);
@@ -68,6 +70,15 @@ export default function DocumentsPage() {
               kind: "Pre-notification letter",
               label: `Pre-inspection notification — ${insp.inspection_date || "inspection"}`,
               url: insp.signed_notification_pdf_url,
+              uploaded_at: insp.updated_at || insp.created_at,
+            });
+          }
+          if (insp.signed_post_notification_pdf_url) {
+            filesByApp[insp.application_id]?.push({
+              id: `postnotif-${insp.id}`,
+              kind: "Post-notification letter",
+              label: `Post-inspection notification — ${insp.inspection_date || "inspection"}`,
+              url: insp.signed_post_notification_pdf_url,
               uploaded_at: insp.updated_at || insp.created_at,
             });
           }

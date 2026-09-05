@@ -243,6 +243,15 @@ export default function ApplicationDetailPage() {
         uploaded_at: insp.updated_at || insp.created_at,
       })),
     ...inspections
+      .filter((insp) => insp.signed_post_notification_pdf_url)
+      .map((insp) => ({
+        id: `postnotif-${insp.id}`,
+        kind: "Post-notification letter",
+        label: `Post-inspection notification — ${insp.inspection_date || "inspection"}`,
+        url: insp.signed_post_notification_pdf_url,
+        uploaded_at: insp.updated_at || insp.created_at,
+      })),
+    ...inspections
       .filter((insp) => insp.report_url)
       .map((insp) => ({
         id: `insp-${insp.id}`,
@@ -363,10 +372,29 @@ export default function ApplicationDetailPage() {
                       <p className="mt-1 text-xs">A reinspection date will be set by the admin.</p>
                     </div>
                   )}
+                  {latestInspection.compliant === false &&
+                    (latestInspection.signed_post_notification_pdf_url ? (
+                      <PdfViewer
+                        url={latestInspection.signed_post_notification_pdf_url}
+                        title="Post-inspection notification letter"
+                        height={340}
+                      />
+                    ) : (
+                      <p className="text-sm text-ink/50">
+                        Your post-inspection notification letter will appear here once it's been signed.
+                      </p>
+                    ))}
                 </>
               ) : (
                 <p className="text-sm text-ink/60">Waiting for the admin to set an inspection date.</p>
               )}
+            </div>
+          )}
+
+          {isCertificateStage && latestInspection?.signed_post_notification_pdf_url && (
+            <div className="card space-y-3">
+              <h2 className="font-display text-lg font-semibold text-seal">Post-inspection notification letter</h2>
+              <PdfViewer url={latestInspection.signed_post_notification_pdf_url} title="Post-inspection notification letter" height={340} />
             </div>
           )}
 

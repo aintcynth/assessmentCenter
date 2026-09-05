@@ -14,6 +14,7 @@ import { generateCertificatePdf, generateAouPdf } from "@/lib/certificatePdf";
 import { loadImageAsPngDataUrl } from "@/lib/loadImage";
 import { generateCertNumber, previewCertNumber } from "@/lib/certNumber";
 import { generatePreNotificationPdf } from "@/lib/preNotificationPdf";
+import { generatePostNotificationPdf } from "@/lib/postNotificationPdf";
 
 // Client-only Supabase calls happen at render time, so skip static
 // prerendering (which runs at build time, before env vars may be wired up).
@@ -40,6 +41,8 @@ export default function AdminApplicationDetailPage() {
   const [reportFile, setReportFile] = useState(null);
   const [signedLetterFile, setSignedLetterFile] = useState(null);
   const [signedLetterBusy, setSignedLetterBusy] = useState(false);
+  const [postNotifFile, setPostNotifFile] = useState(null);
+  const [postNotifBusy, setPostNotifBusy] = useState(false);
   const [lackings, setLackings] = useState("");
 
   const [issuanceDate, setIssuanceDate] = useState("");
@@ -300,6 +303,49 @@ export default function AdminApplicationDetailPage() {
     }
   }
 
+  async function handleUploadSignedPostNotification(e) {
+    e.preventDefault();
+    if (!postNotifFile || !inspections[0]) return;
+    setPostNotifBusy(true);
+    setError("");
+    try {
+      const user = await currentAdmin();
+      const stored = `${user.id}/${id}/signed-post-notification-${Date.now()}-${postNotifFile.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from("accreditation-files")
+        .upload(stored, postNotifFile);
+      if (uploadError) throw uploadError;
+      const signedUrl = supabase.storage.from("accreditation-files").getPublicUrl(stored).data.publicUrl;
+
+      const { error: updateError } = await supabase
+        .from("inspections")
+        .update({ signed_post_notification_pdf_url: signedUrl })
+        .eq("id", inspections[0].id);
+      if (updateError) throw updateError;
+
+      await notifyUser(supabase, {
+        userId: app.user_id,
+        applicationId: id,
+        title: "Post-inspection notification letter ready",
+        message: "Your signed post-inspection notification letter is ready to view.",
+      });
+
+      await logActivity(supabase, {
+        applicationId: id,
+        actorId: user.id,
+        actorName: profile?.ac_name,
+        action: "Signed post-notification letter uploaded",
+      });
+
+      setPostNotifFile(null);
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setPostNotifBusy(false);
+    }
+  }
+
   async function handleMarkNonCompliant() {
     if (!lackings.trim()) {
       setError("Describe what's lacking so the applicant knows what to fix.");
@@ -318,9 +364,29 @@ export default function AdminApplicationDetailPage() {
       }
 
       const latest = inspections[0];
+      const postNotifBlob = generatePostNotificationPdf({
+        acManager: app.profiles?.ac_manager,
+        centerName: app.profiles?.ac_name,
+        address: app.profiles?.address,
+        qualificationName: app.qualifications?.name,
+        compliant: false,
+        lackings,
+      });
+      const postNotifPath = `${user.id}/${id}/post-notification-${Date.now()}.pdf`;
+      const { error: postNotifUploadError } = await supabase.storage
+        .from("accreditation-files")
+        .upload(postNotifPath, postNotifBlob, { contentType: "application/pdf" });
+      if (postNotifUploadError) throw postNotifUploadError;
+      const postNotifUrl = supabase.storage.from("accreditation-files").getPublicUrl(postNotifPath).data.publicUrl;
+
       const { error: updateError } = await supabase
         .from("inspections")
-        .update({ compliant: false, lackings, report_url: reportUrl || latest?.report_url })
+        .update({
+          compliant: false,
+          lackings,
+          report_url: reportUrl || latest?.report_url,
+          post_notification_pdf_url: postNotifUrl,
+        })
         .eq("id", latest.id);
       if (updateError) throw updateError;
 
@@ -356,9 +422,24 @@ export default function AdminApplicationDetailPage() {
       }
 
       const latest = inspections[0];
+      const postNotifBlob = generatePostNotificationPdf({
+        acManager: app.profiles?.ac_manager,
+        centerName: app.profiles?.ac_name,
+        address: app.profiles?.address,
+        qualificationName: app.qualifications?.name,
+        compliant: true,
+        lackings: null,
+      });
+      const postNotifPath = `${user.id}/${id}/post-notification-${Date.now()}.pdf`;
+      const { error: postNotifUploadError } = await supabase.storage
+        .from("accreditation-files")
+        .upload(postNotifPath, postNotifBlob, { contentType: "application/pdf" });
+      if (postNotifUploadError) throw postNotifUploadError;
+      const postNotifUrl = supabase.storage.from("accreditation-files").getPublicUrl(postNotifPath).data.publicUrl;
+
       const { error: inspUpdateError } = await supabase
         .from("inspections")
-        .update({ compliant: true, report_url: reportUrl || latest?.report_url })
+        .update({ compliant: true, report_url: reportUrl || latest?.report_url, post_notification_pdf_url: postNotifUrl })
         .eq("id", latest.id);
       if (inspUpdateError) throw inspUpdateError;
 
@@ -666,6 +747,53 @@ export default function AdminApplicationDetailPage() {
   const latestInspection = inspections[0];
   const isCertificateStage = app.status === "awaiting_payment" || app.status === "certificate_processing";
   const allAcknowledged = payment?.receipt_status === "acknowledged" && payment?.aou_status === "acknowledged";
+  const inspectionDateArrived = latestInspection?.inspection_date
+    ? new Date(latestInspection.inspection_date + "T00:00:00") <= new Date()
+    : false;
+
+  function postNotificationBlock() {
+    if (!latestInspection?.post_notification_pdf_url) return null;
+    return (
+      <div className="card space-y-4">
+        <h2 className="font-display text-lg font-semibold text-seal">Post-inspection notification letter</h2>
+        {latestInspection.signed_post_notification_pdf_url ? (
+          <PdfViewer
+            url={latestInspection.signed_post_notification_pdf_url}
+            title="Post-inspection notification letter (signed)"
+            height={340}
+          />
+        ) : (
+          <>
+            <PdfViewer
+              url={latestInspection.post_notification_pdf_url}
+              title="Post-inspection notification letter (unsigned draft)"
+              height={340}
+            />
+            <form
+              onSubmit={handleUploadSignedPostNotification}
+              className="rounded-seal border border-seal/10 p-4 space-y-3"
+            >
+              <p className="text-sm font-medium text-ink">Upload signed post-inspection letter</p>
+              <p className="text-xs text-ink/50">
+                Print and sign the draft above, then upload the scanned copy. The client only sees this signed
+                version.
+              </p>
+              <input
+                type="file"
+                accept="application/pdf,image/*"
+                required
+                className="input-field"
+                onChange={(e) => setPostNotifFile(e.target.files?.[0] || null)}
+              />
+              <button type="submit" disabled={postNotifBusy || !postNotifFile} className="btn-secondary">
+                {postNotifBusy ? "Uploading…" : "Upload signed letter"}
+              </button>
+            </form>
+          </>
+        )}
+      </div>
+    );
+  }
 
   // Every file tied to this application, in one place: the original
   // application documents plus any inspection reports and payment/AOU
@@ -694,6 +822,24 @@ export default function AdminApplicationDetailPage() {
         kind: "Pre-notification letter",
         label: `Pre-inspection notification (signed) — ${insp.inspection_date || "inspection"}`,
         url: insp.signed_notification_pdf_url,
+        uploaded_at: insp.updated_at || insp.created_at,
+      })),
+    ...inspections
+      .filter((insp) => insp.post_notification_pdf_url)
+      .map((insp) => ({
+        id: `postnotif-${insp.id}`,
+        kind: "Post-notification letter",
+        label: `Post-inspection notification (unsigned draft) — ${insp.inspection_date || "inspection"}`,
+        url: insp.post_notification_pdf_url,
+        uploaded_at: insp.created_at,
+      })),
+    ...inspections
+      .filter((insp) => insp.signed_post_notification_pdf_url)
+      .map((insp) => ({
+        id: `postnotif-signed-${insp.id}`,
+        kind: "Post-notification letter",
+        label: `Post-inspection notification (signed) — ${insp.inspection_date || "inspection"}`,
+        url: insp.signed_post_notification_pdf_url,
         uploaded_at: insp.updated_at || insp.created_at,
       })),
     ...inspections
@@ -859,14 +1005,6 @@ export default function AdminApplicationDetailPage() {
                 {latestInspection.expert_name}
               </p>
 
-              {latestInspection.notification_pdf_url && (
-                <PdfViewer
-                  url={latestInspection.notification_pdf_url}
-                  title="Pre-inspection notification letter (unsigned draft)"
-                  height={340}
-                />
-              )}
-
               {latestInspection.signed_notification_pdf_url ? (
                 <PdfViewer
                   url={latestInspection.signed_notification_pdf_url}
@@ -874,48 +1012,68 @@ export default function AdminApplicationDetailPage() {
                   height={340}
                 />
               ) : (
-                <form onSubmit={handleUploadSignedLetter} className="rounded-seal border border-seal/10 p-4 space-y-3">
-                  <p className="text-sm font-medium text-ink">Upload signed pre-notification letter</p>
-                  <p className="text-xs text-ink/50">
-                    Print and sign the draft above, then upload the scanned copy. The client only sees this signed
-                    version.
-                  </p>
-                  <input
-                    type="file"
-                    accept="application/pdf,image/*"
-                    required
-                    className="input-field"
-                    onChange={(e) => setSignedLetterFile(e.target.files?.[0] || null)}
-                  />
-                  <button type="submit" disabled={signedLetterBusy || !signedLetterFile} className="btn-secondary">
-                    {signedLetterBusy ? "Uploading…" : "Upload signed letter"}
-                  </button>
-                </form>
+                <>
+                  {latestInspection.notification_pdf_url && (
+                    <PdfViewer
+                      url={latestInspection.notification_pdf_url}
+                      title="Pre-inspection notification letter (unsigned draft)"
+                      height={340}
+                    />
+                  )}
+                  <form onSubmit={handleUploadSignedLetter} className="rounded-seal border border-seal/10 p-4 space-y-3">
+                    <p className="text-sm font-medium text-ink">Upload signed pre-notification letter</p>
+                    <p className="text-xs text-ink/50">
+                      Print and sign the draft above, then upload the scanned copy. The client only sees this signed
+                      version.
+                    </p>
+                    <input
+                      type="file"
+                      accept="application/pdf,image/*"
+                      required
+                      className="input-field"
+                      onChange={(e) => setSignedLetterFile(e.target.files?.[0] || null)}
+                    />
+                    <button type="submit" disabled={signedLetterBusy || !signedLetterFile} className="btn-secondary">
+                      {signedLetterBusy ? "Uploading…" : "Upload signed letter"}
+                    </button>
+                  </form>
+                </>
               )}
 
-              <label className="label">Inspection report (optional)</label>
-              <input
-                type="file"
-                className="input-field"
-                onChange={(e) => setReportFile(e.target.files?.[0] || null)}
-              />
-              <label className="label">Lackings (required if non-compliant)</label>
-              <textarea
-                className="input-field"
-                rows={2}
-                value={lackings}
-                onChange={(e) => setLackings(e.target.value)}
-              />
-              <div className="flex gap-3">
-                <button type="button" disabled={busy} onClick={handleMarkCompliant} className="btn-primary">
-                  Yes, compliant
-                </button>
-                <button type="button" disabled={busy} onClick={handleMarkNonCompliant} className="btn-secondary">
-                  No, non-compliant
-                </button>
-              </div>
+              {inspectionDateArrived ? (
+                <>
+                  <label className="label">Inspection report (optional)</label>
+                  <input
+                    type="file"
+                    className="input-field"
+                    onChange={(e) => setReportFile(e.target.files?.[0] || null)}
+                  />
+                  <label className="label">Lackings (required if non-compliant)</label>
+                  <textarea
+                    className="input-field"
+                    rows={2}
+                    value={lackings}
+                    onChange={(e) => setLackings(e.target.value)}
+                  />
+                  <div className="flex gap-3">
+                    <button type="button" disabled={busy} onClick={handleMarkCompliant} className="btn-primary">
+                      Yes, compliant
+                    </button>
+                    <button type="button" disabled={busy} onClick={handleMarkNonCompliant} className="btn-secondary">
+                      No, non-compliant
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <p className="rounded-seal border border-brass/30 bg-brass-light/20 px-4 py-3 text-sm text-brass">
+                  The inspection report and compliance decision can be recorded on or after{" "}
+                  <span className="font-medium">{latestInspection.inspection_date}</span>.
+                </p>
+              )}
             </div>
           )}
+
+          {app.status === "inspection_scheduled" && latestInspection?.compliant === false && postNotificationBlock()}
 
           {app.status === "inspection_scheduled" && latestInspection?.compliant === false && (
             <form onSubmit={handleScheduleInspection} className="card space-y-4">
@@ -960,6 +1118,8 @@ export default function AdminApplicationDetailPage() {
               </button>
             </form>
           )}
+
+          {isCertificateStage && postNotificationBlock()}
 
           {isCertificateStage && !app.issuance_date && (
             <form onSubmit={handleGenerateCertificate} className="card space-y-4">

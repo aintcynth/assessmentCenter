@@ -45,7 +45,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <ClientShell acName={profile?.ac_name}>
+    <ClientShell acName={profile?.email}>
       <div className="mb-8">
         <p className="text-xs font-semibold uppercase tracking-wider text-brass">Profile</p>
         <h1 className="font-display text-3xl font-semibold text-seal">Your details</h1>

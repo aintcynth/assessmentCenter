@@ -69,8 +69,8 @@ export default function AppFrame({ brandLabel, brandSub, navLinks, name, roleLab
       >
         <div className="flex items-center justify-between gap-2 px-5 py-6">
           <div className="flex min-w-0 items-center gap-2.5">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white font-display text-base font-bold text-seal">
-              A
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white font-display text-base font-bold text-seal">
+              CAC
             </div>
             {!collapsed && (
               <div className="min-w-0">

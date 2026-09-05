@@ -285,7 +285,7 @@ export default function ApplicationDetailPage() {
   ].sort((a, b) => new Date(b.uploaded_at || 0) - new Date(a.uploaded_at || 0));
 
   return (
-    <ClientShell acName={profile?.ac_name}>
+    <ClientShell acName={profile?.email}>
       <button onClick={() => router.push("/dashboard")} className="btn-ghost mb-4 !px-0">
         ← Back to dashboard
       </button>

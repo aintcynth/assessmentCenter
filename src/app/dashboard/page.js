@@ -22,7 +22,7 @@ export default async function DashboardPage() {
   const approved = apps.filter((a) => a.status === "approved").length;
 
   return (
-    <ClientShell acName={profile.ac_name}>
+    <ClientShell acName={profile.email}>
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-brass">Applicant workspace</p>

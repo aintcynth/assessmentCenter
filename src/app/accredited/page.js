@@ -16,7 +16,7 @@ export default async function AccreditedPage() {
     .order("created_at", { ascending: false });
 
   return (
-    <ClientShell acName={profile.ac_name}>
+    <ClientShell acName={profile.email}>
       <div className="mb-8">
         <p className="text-xs font-semibold uppercase tracking-wider text-brass">Accredited</p>
         <h1 className="font-display text-3xl font-semibold text-seal">Your accredited qualifications</h1>

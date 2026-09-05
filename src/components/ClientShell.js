@@ -25,8 +25,8 @@ export default function ClientShell({ acName, children }) {
 
   return (
     <AppFrame
-      brandLabel="Accreditation Portal"
-      brandSub="Applicant workspace"
+      brandLabel="Accreditation"
+      brandSub="User portal"
       navLinks={LINKS}
       name={acName}
       roleLabel="Applicant"

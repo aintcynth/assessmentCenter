@@ -164,14 +164,14 @@ function ApplyWizard() {
 
   if (loading) {
     return (
-      <ClientShell acName={profile?.ac_name}>
+      <ClientShell acName={profile?.email}>
         <p className="text-sm text-ink/50">Loading…</p>
       </ClientShell>
     );
   }
 
   return (
-    <ClientShell acName={profile?.ac_name}>
+    <ClientShell acName={profile?.email}>
       <div className="mb-8">
         <p className="text-xs font-semibold uppercase tracking-wider text-brass">Apply for scholarship</p>
         <h1 className="font-display text-3xl font-semibold text-seal">Center accreditation application</h1>

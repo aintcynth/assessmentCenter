@@ -129,7 +129,7 @@ export default function DocumentsPage() {
   const totalFiles = applications.reduce((sum, a) => sum + a.files.length, 0);
 
   return (
-    <ClientShell acName={profile?.ac_name}>
+    <ClientShell acName={profile?.email}>
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-brass">Documents</p>
